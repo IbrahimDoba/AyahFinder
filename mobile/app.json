@@ -22,7 +22,8 @@
     "android": {
       "package": "com.ayahfinder.app",
       "permissions": [
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
       ]
     },
     "plugins": [
@@ -33,6 +34,12 @@
         }
       ]
     ],
-    "newArchEnabled": false
+    "newArchEnabled": false,
+    "extra": {
+      "eas": {
+        "projectId": "e6428493-42e0-490c-b506-43610641f46e"
+      }
+    },
+    "owner": "silverfangs123"
   }
 }
