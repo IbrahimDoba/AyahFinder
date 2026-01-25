@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Ayahfinder",
-    "slug": "ayahfinder",
+    "name": "Ayahfinder App",
+    "slug": "ayahfinder-app",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -32,12 +32,13 @@
         {
           "microphonePermission": "Allow Ayahfinder to access your microphone to identify Quran recitations."
         }
-      ]
+      ],
+      "expo-font"
     ],
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "extra": {
       "eas": {
-        "projectId": "e6428493-42e0-490c-b506-43610641f46e"
+        "projectId": "e8673c2c-a93e-4518-8248-584f58b24e6b"
       }
     },
     "owner": "silverfangs123"

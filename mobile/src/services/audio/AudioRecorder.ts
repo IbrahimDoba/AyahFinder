@@ -254,6 +254,7 @@ export class AudioRecorder {
   /**
    * Start chunked recording
    * This will automatically create and emit chunks at the specified interval
+   * NOTE: Now records only ONE chunk, then auto-stops
    */
   async startChunkedRecording(): Promise<void> {
     if (!this.chunkingConfig.enabled || !this.onChunkReady) {
@@ -266,28 +267,31 @@ export class AudioRecorder {
     this.totalRecordingDuration = 0;
     this.isStoppingChunks = false; // Reset stopping flag
 
-    // Start the first chunk
+    // Start the first (and only) chunk
     await this.startRecording();
 
-    // Set up chunk timer
-    this.chunkTimer = setInterval(async () => {
+    // Set up ONE-TIME timer for single chunk
+    this.chunkTimer = setTimeout(async () => {
+      console.log('⏰ Single chunk timer fired - creating chunk and stopping');
       await this.createNextChunk();
+      // Don't set another timer - we only want one chunk
     }, this.chunkingConfig.chunkInterval);
   }
 
   /**
-   * Create the next chunk by stopping current recording and starting a new one
-   * This is called automatically by the chunk timer
+   * Create the next chunk by stopping current recording
+   * This is called automatically by the chunk timer (now only ONCE)
    */
   private async createNextChunk(): Promise<void> {
     try {
       // Check if we're being stopped
       if (this.isStoppingChunks) {
-        console.log('🛑 Stopping chunks, not creating next chunk');
+        console.log('🛑 Stopping chunks, not creating chunk');
         return;
       }
 
       if (!this.recording || !this.onChunkReady) {
+        console.log('⚠️ No recording or callback available');
         return;
       }
 
@@ -295,11 +299,17 @@ export class AudioRecorder {
       const status = await this.recording.getStatusAsync();
       const chunkStartTime = this.totalRecordingDuration;
 
+      console.log('📊 Recording status before stop:', {
+        isRecording: status.isRecording,
+        isDoneRecording: status.isDoneRecording,
+        duration: status.durationMillis
+      });
+
       await this.recording.stopAndUnloadAsync();
       const uri = this.recording.getURI();
 
       if (!uri) {
-        console.error('Failed to get chunk URI');
+        console.error('❌ Failed to get chunk URI');
         return;
       }
 
@@ -315,36 +325,32 @@ export class AudioRecorder {
         format: 'm4a',
       };
 
+      console.log(`✅ Created chunk ${this.chunkIndex} (${chunkDuration}ms)`);
+
+      // Clear recording reference BEFORE emitting chunk
+      this.recording = null;
+      this.status = 'stopped';
+
       // Increment chunk index
       this.chunkIndex++;
 
       // Emit the chunk via callback
+      // NOTE: This is the ONLY chunk - no more recordings will be started
+      console.log('📤 Emitting chunk to callback...');
       this.onChunkReady(chunk);
 
-      // Check again if we should continue (callback might have stopped us)
-      if (this.isStoppingChunks) {
-        console.log('🛑 Stopped while processing chunk, not starting next recording');
-        return;
-      }
-
-      // Start the next recording immediately (if still within max duration)
-      if (this.totalRecordingDuration < this.config.maxDuration) {
-        await this.startRecording();
-      } else {
-        // Max duration reached, stop chunking
-        this.stopChunkedRecording();
-        if (this.onAutoStop) {
-          this.onAutoStop();
-        }
-      }
+      console.log('✅ Single chunk created and emitted - recording complete');
     } catch (error) {
-      console.error('Error creating chunk:', error);
+      console.error('❌ Error creating chunk:', error);
       this.status = 'error';
+      this.recording = null;
     }
   }
 
   /**
    * Stop chunked recording
+   * NOTE: For single-chunk mode, this usually won't have anything to stop
+   * since the chunk timer already stopped and unloaded the recording
    */
   async stopChunkedRecording(): Promise<AudioChunk | null> {
     console.log('🛑 stopChunkedRecording called');
@@ -353,10 +359,10 @@ export class AudioRecorder {
     this.isStoppingChunks = true;
 
     try {
-      // Clear chunk timer first
+      // Clear chunk timer first (now using setTimeout instead of setInterval)
       if (this.chunkTimer) {
         console.log('⏹️ Clearing chunk timer');
-        clearInterval(this.chunkTimer);
+        clearTimeout(this.chunkTimer);
         this.chunkTimer = null;
       }
 
@@ -369,7 +375,8 @@ export class AudioRecorder {
 
       // Check if already stopped
       if (!this.recording || this.status === 'stopped' || this.status === 'idle') {
-        console.log('⚠️ Recording already stopped, cleaning up state');
+        console.log('✅ Recording already stopped (expected for single-chunk mode)');
+        // Still clean up state
         this.recording = null;
         this.status = 'stopped';
         this.chunkIndex = 0;
@@ -377,7 +384,9 @@ export class AudioRecorder {
         return null;
       }
 
-      // Get the final chunk
+      // Only reach here if manually stopped before chunk timer fired
+      console.log('⚠️ Manual stop before chunk timer - stopping active recording');
+
       const status = await this.recording.getStatusAsync();
       console.log('📊 Recording status:', {
         isRecording: status.isRecording,
@@ -385,8 +394,8 @@ export class AudioRecorder {
       });
 
       // Check if recording is actually active before stopping
-      if (!status.isRecording && !status.isDoneRecording) {
-        console.log('⚠️ Recording not active, cleaning up');
+      if (!status.isRecording && status.isDoneRecording) {
+        console.log('⚠️ Recording already done, cleaning up');
         this.recording = null;
         this.status = 'stopped';
         this.chunkIndex = 0;
@@ -427,17 +436,22 @@ export class AudioRecorder {
 
       console.log('✅ Chunked recording stopped successfully');
       return finalChunk;
-    } catch (error) {
-      console.error('❌ Error stopping chunked recording:', error);
+    } catch (error: any) {
+      // Only log error if it's NOT the "already unloaded" error
+      if (error.message && error.message.includes('already been unloaded')) {
+        console.log('✅ Recording already unloaded (expected for single-chunk mode)');
+      } else {
+        console.error('❌ Error stopping chunked recording:', error);
+      }
 
-      // Force cleanup on error
+      // Force cleanup
       this.status = 'stopped';
       this.recording = null;
       this.chunkIndex = 0;
       this.totalRecordingDuration = 0;
 
       if (this.chunkTimer) {
-        clearInterval(this.chunkTimer);
+        clearTimeout(this.chunkTimer);
         this.chunkTimer = null;
       }
       if (this.autoStopTimer) {

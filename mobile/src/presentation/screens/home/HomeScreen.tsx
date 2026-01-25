@@ -3,10 +3,11 @@
  * INCREMENTALLY TESTING: Step 7c - Add alerts for match results
  */
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet, Alert, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '@/presentation/navigation/RootNavigator';
 import { COLORS, REALTIME_MATCHING_CONFIG } from '@/constants';
 import { ERROR_MESSAGES } from '@/constants/errors';
@@ -23,11 +24,13 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 export default function HomeScreen() {
   const navigation = useNavigation<NavigationProp>();
   const audioRecorder = useState(() => new AudioRecorder())[0];
-  const { isRecording, setRecording, isProcessing } = useRecognitionStore();
+  const { isRecording, setRecording, isProcessing, setProcessing } = useRecognitionStore();
   const { recognize } = useRecognition();
 
-  // Ref to prevent multiple stop calls
+  // Refs to prevent multiple stop calls and track match state
   const isStoppingRef = useRef(false);
+  const matchFoundRef = useRef(false);
+  const [showRetry, setShowRetry] = useState(false);
 
   const {
     isMatching,
@@ -47,19 +50,22 @@ export default function HomeScreen() {
   }, []);
 
   // Cleanup: Stop recording when component unmounts (e.g., when navigating away)
+  // NOTE: Empty dependency array so this ONLY runs on actual unmount, not on state changes
   useEffect(() => {
     return () => {
       console.log('🧹 HomeScreen unmounting, cleaning up recording...');
-      if (isRecording) {
+      // Check if recording is still active
+      if (audioRecorder.isRecording()) {
         audioRecorder.disableChunking();
         audioRecorder.stopChunkedRecording().catch((err) => {
           console.error('Error stopping recording on unmount:', err);
         });
-        setRecording(false);
-        stopMatching();
       }
+      // Always stop matching on unmount
+      stopMatching();
     };
-  }, [isRecording]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps - only cleanup on actual unmount
 
   const handleButtonPress = async () => {
     if (isRecording) {
@@ -75,8 +81,11 @@ export default function HomeScreen() {
     try {
       console.log('🎙️ startRecording called');
 
-      // Reset stopping flag
+      // Reset states
       isStoppingRef.current = false;
+      matchFoundRef.current = false;
+      setShowRetry(false);
+      setProcessing(false);
 
       // Request permissions
       const hasPermission = await audioRecorder.requestPermissions();
@@ -89,25 +98,61 @@ export default function HomeScreen() {
 
       console.log('✅ Permissions granted');
 
-      // Enable chunking with callback
+      // Enable chunking with callback for SINGLE chunk
       audioRecorder.enableChunking(
         { chunkInterval: REALTIME_MATCHING_CONFIG.CHUNK_INTERVAL },
         async chunk => {
-          console.log(
-            `📦 Chunk ${chunk.chunkIndex} ready:`,
-            chunk.duration,
-            'ms',
-            'isMatching:',
-            isMatching
-          );
-          // Process chunk in real-time
-          console.log('About to call processChunk...');
-          await processChunk(chunk);
-          console.log('processChunk completed for chunk', chunk.chunkIndex);
+          console.log(`📦 Single chunk ready: ${chunk.duration}ms`);
+
+          // Stop recording hardware (no more chunks)
+          console.log('🛑 Stopping recording hardware...');
+          setRecording(false);
+          audioRecorder.disableChunking();
+          await audioRecorder.stopChunkedRecording();
+
+          // Set processing state
+          console.log('⏳ Starting to process chunk...');
+          setProcessing(true);
+
+          try {
+            // Process the single chunk (BEFORE stopping matching!)
+            console.log('📤 Processing chunk...');
+            await processChunk(chunk);
+            console.log('✅ Chunk processing completed');
+
+            // NOW stop matching after processing is done
+            console.log('🛑 Stopping matching after processing');
+            stopMatching();
+
+            // Wait a bit for the callback to execute
+            setTimeout(() => {
+              // If no match was found, show retry
+              if (!matchFoundRef.current) {
+                console.log('⏱️ No match found after processing');
+                setProcessing(false);
+                setShowRetry(true);
+                Alert.alert(
+                  'No Match Found',
+                  'Could not identify the recitation. Please try again with a clearer audio.',
+                  [{ text: 'OK' }]
+                );
+              }
+            }, 2000);
+          } catch (error) {
+            console.error('❌ Error processing chunk:', error);
+            stopMatching(); // Stop matching on error too
+            setProcessing(false);
+            setShowRetry(true);
+            Alert.alert(
+              'Processing Failed',
+              'Failed to process audio. Please try again.',
+              [{ text: 'OK' }]
+            );
+          }
         }
       );
 
-      console.log('✅ Chunking enabled');
+      console.log('✅ Single-chunk mode enabled');
 
       // Start real-time matching with auto-navigation callback
       startMatching((result: RecognitionResult) => {
@@ -119,15 +164,18 @@ export default function HomeScreen() {
           ayahId: result.ayah?.id,
         });
 
-        // Auto-stop recording
-        stopRecording();
+        // Mark that match was found
+        matchFoundRef.current = true;
+
+        // Clear processing state
+        setProcessing(false);
 
         // Navigate directly to Surah with the matched verse
         if (result.surah && result.ayah) {
           navigation.navigate('Surah', {
             surahNumber: result.surah.number,
             surahName: result.surah.nameTransliteration,
-            highlightAyah: result.ayah.ayahNumber, // Fixed: use ayahNumber instead of number
+            highlightAyah: result.ayah.ayahNumber,
             fromRecognition: true,
           });
         }
@@ -135,20 +183,22 @@ export default function HomeScreen() {
 
       console.log('✅ Real-time matching started');
 
-      // Start chunked recording
+      // Start chunked recording (will record for CHUNK_INTERVAL then auto-stop)
       await audioRecorder.startChunkedRecording();
       setRecording(true);
 
-      console.log('🎙️ Started real-time matching...');
+      console.log('🎙️ Recording single chunk...');
     } catch (error: any) {
       console.error('Start recording error:', error);
+      setProcessing(false);
+      setShowRetry(true);
       Alert.alert('Error', 'Failed to start recording');
     }
   };
 
   const stopRecording = async () => {
     try {
-      console.log('⏹️ stopRecording called');
+      console.log('⏹️ Manual stopRecording called');
 
       // Prevent multiple simultaneous stop calls
       if (isStoppingRef.current) {
@@ -166,50 +216,28 @@ export default function HomeScreen() {
       isStoppingRef.current = true;
 
       // Set to false first to prevent multiple calls
-      console.log('Setting recording to false');
       setRecording(false);
 
-      console.log('Stopping matching');
       stopMatching();
-
-      console.log('Disabling chunking');
       audioRecorder.disableChunking();
-
-      console.log('Stopping chunked recording');
       await audioRecorder.stopChunkedRecording();
 
-      console.log(`🛑 Stopped recording. Total chunks sent: ${chunksSent}`);
+      console.log('🛑 Recording stopped manually');
 
-      // Reset stopping flag after a delay
+      // Reset stopping flag
       setTimeout(() => {
         isStoppingRef.current = false;
-      }, 1000);
-
-      // If no match was found during real-time, show message
-      if (matchingConfidence === 0) {
-        Alert.alert(
-          'No Match Found',
-          'Could not identify the recitation. Please try again with a clearer audio.',
-          [{ text: 'OK' }]
-        );
-      } else if (
-        matchingConfidence <
-        REALTIME_MATCHING_CONFIG.CONFIDENCE_THRESHOLD * 100
-      ) {
-        Alert.alert(
-          'Low Confidence',
-          `Found a possible match but confidence was only ${matchingConfidence}%. Please try again.`,
-          [{ text: 'OK' }]
-        );
-      }
-
-      console.log('✅ Stop recording complete');
+      }, 500);
     } catch (error: any) {
       console.error('Stop recording error:', error);
-      Alert.alert('Error', 'Failed to stop recording');
-      // Reset stopping flag on error
       isStoppingRef.current = false;
     }
+  };
+
+  const handleRetry = () => {
+    console.log('🔄 Retry button pressed');
+    setShowRetry(false);
+    startRecording();
   };
 
   return (
@@ -232,25 +260,46 @@ export default function HomeScreen() {
             isProcessing={isProcessing}
             onPress={handleButtonPress}
           />
+
+          {/* Retry Button */}
+          {showRetry && !isRecording && !isProcessing && (
+            <Pressable style={styles.retryButton} onPress={handleRetry}>
+              <Ionicons name="refresh" size={24} color={COLORS.primary[500]} />
+              <Text variant="body" color={COLORS.primary[500]}>
+                Retry
+              </Text>
+            </Pressable>
+          )}
         </View>
 
         {/* Instructions */}
         <View style={styles.instructions}>
-          <Text
-            variant="caption"
-            align="center"
-            color={COLORS.text.secondary}
-          >
-            Tap the button and play a Quran recitation
-          </Text>
-          <Text
-            variant="caption"
-            align="center"
-            color={COLORS.text.secondary}
-          >
-            It will automatically find and show the verse
-          </Text>
-         
+          {isProcessing ? (
+            <Text
+              variant="body"
+              align="center"
+              color={COLORS.primary[500]}
+            >
+              Processing audio...
+            </Text>
+          ) : (
+            <>
+              <Text
+                variant="caption"
+                align="center"
+                color={COLORS.text.secondary}
+              >
+                Tap the button and play a Quran recitation
+              </Text>
+              <Text
+                variant="caption"
+                align="center"
+                color={COLORS.text.secondary}
+              >
+                Recording will auto-stop after {REALTIME_MATCHING_CONFIG.CHUNK_INTERVAL / 1000} seconds
+              </Text>
+            </>
+          )}
         </View>
       </View>
     </SafeAreaView>
@@ -279,5 +328,22 @@ const styles = StyleSheet.create({
   instructions: {
     paddingHorizontal: 24,
     gap: 4,
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    backgroundColor: COLORS.background.paper,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: COLORS.primary[500],
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
 });

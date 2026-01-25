@@ -43,3 +43,7 @@ ENV/
 
 # Claude
 .claude/
+
+# Documentation (local only)
+docs/
+.expo
