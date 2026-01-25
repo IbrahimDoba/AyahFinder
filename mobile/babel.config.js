@@ -19,8 +19,6 @@ module.exports = function (api) {
           },
         },
       ],
-      // 'uniwind/babel', // Removed - causing package export errors
-      'react-native-reanimated/plugin',
       [
         'module:react-native-dotenv',
         {
@@ -28,6 +26,8 @@ module.exports = function (api) {
           path: '.env',
         },
       ],
+      // 'uniwind/babel', // Removed - causing package export errors
+      'react-native-reanimated/plugin', // Must be last
     ],
   };
 };
