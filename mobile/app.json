@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "Ayahfinder",
+    "slug": "ayahfinder",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#1e7b5f"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ayahfinder.app",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Ayahfinder needs microphone access to listen to Quran recitation for identification."
+      }
+    },
+    "android": {
+      "package": "com.ayahfinder.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow Ayahfinder to access your microphone to identify Quran recitations."
+        }
+      ]
+    ],
+    "newArchEnabled": false
+  }
+}

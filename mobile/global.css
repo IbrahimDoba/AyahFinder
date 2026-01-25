@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer theme {
+  @variant light {
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.15 0 0);
+    --surface: oklch(0.98 0 0);
+    --accent: oklch(0.55 0.25 264);
+    --accent-foreground: oklch(1 0 0);
+    --success: oklch(0.65 0.25 145);
+    --warning: oklch(0.75 0.25 85);
+    --danger: oklch(0.65 0.25 27);
+  }
+
+  @variant dark {
+    --background: oklch(0.15 0 0);
+    --foreground: oklch(0.95 0 0);
+    --surface: oklch(0.2 0 0);
+    --accent: oklch(0.6 0.25 264);
+    --accent-foreground: oklch(1 0 0);
+    --success: oklch(0.65 0.25 145);
+    --warning: oklch(0.75 0.25 85);
+    --danger: oklch(0.65 0.25 27);
+  }
+}

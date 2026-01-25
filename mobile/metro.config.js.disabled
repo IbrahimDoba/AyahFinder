@@ -1,0 +1,18 @@
+// @ts-check
+const { getDefaultConfig } = require('expo/metro-config');
+
+const config = getDefaultConfig(__dirname);
+
+// Add Uniwind transformer
+config.transformer = {
+  ...config.transformer,
+  babelTransformerPath: require.resolve('uniwind/metro/transformer'),
+};
+
+// Add CSS extension
+config.resolver = {
+  ...config.resolver,
+  sourceExts: [...(config.resolver?.sourceExts || []), 'css'],
+};
+
+module.exports = config;

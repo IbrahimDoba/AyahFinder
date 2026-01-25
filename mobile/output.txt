@@ -1,0 +1,9 @@
+﻿Initializing service...
+QuranMatchingService: Indexed 6236 ayahs.
+Searching for: ╪º┘ä╪¡┘à╪» ┘ä┘ä┘ç ╪▒╪¿ ╪º┘ä╪╣╪º┘ä┘à┘è┘å
+Match found:
+Surah: 2 (Al-Baqarah)
+Ayah: 1
+Text: ╪º┘ä┘ô┘à┘ô
+Translation: Alif, Lam, Meem
+Score: 1
