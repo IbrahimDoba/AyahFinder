@@ -1,6 +1,6 @@
 /**
  * Home Screen
- * INCREMENTALLY TESTING: Step 7c - Add alerts for match results
+ * Audio recognition with usage tracking
  */
 import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, Alert, Pressable } from 'react-native';
@@ -18,6 +18,9 @@ import { useRecognitionStore } from '@/presentation/store/recognitionStore';
 import { AudioRecorder } from '@/services/audio/AudioRecorder';
 import { useRecognition } from '@/presentation/hooks/useRecognition';
 import { useRealTimeRecognition } from '@/presentation/hooks/useRealTimeRecognition';
+import usageValidator from '@/services/usage/UsageValidator';
+import { UpgradePrompt } from '@/presentation/components/usage/UpgradePrompt';
+import type { UsageStats } from '@/services/usage/UsageValidator';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -31,6 +34,25 @@ export default function HomeScreen() {
   const isStoppingRef = useRef(false);
   const matchFoundRef = useRef(false);
   const [showRetry, setShowRetry] = useState(false);
+
+  // Usage tracking state
+  const [usageStats, setUsageStats] = useState<UsageStats | null>(null);
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<string>('');
+
+  // Load usage stats on mount
+  useEffect(() => {
+    loadUsageStats();
+  }, []);
+
+  const loadUsageStats = async () => {
+    try {
+      const stats = await usageValidator.getUsageStats();
+      setUsageStats(stats);
+    } catch (error) {
+      console.error('Error loading usage stats:', error);
+    }
+  };
 
   const {
     isMatching,
@@ -80,6 +102,18 @@ export default function HomeScreen() {
   const startRecording = async () => {
     try {
       console.log('🎙️ startRecording called');
+
+      // Check usage limit FIRST (before recording)
+      const usageCheck = await usageValidator.canPerformSearch();
+
+      if (!usageCheck.allowed) {
+        console.log('❌ Usage limit reached');
+        setUpgradeReason(usageCheck.reason || 'Usage limit reached');
+        setShowUpgradePrompt(true);
+        return;
+      }
+
+      console.log(`✅ Usage check passed: ${usageCheck.remaining}/${usageCheck.limit} remaining`);
 
       // Reset states
       isStoppingRef.current = false;
@@ -155,7 +189,7 @@ export default function HomeScreen() {
       console.log('✅ Single-chunk mode enabled');
 
       // Start real-time matching with auto-navigation callback
-      startMatching((result: RecognitionResult) => {
+      startMatching(async (result: RecognitionResult) => {
         console.log('🎯 Match found! Auto-navigating...');
         console.log('📍 Navigation params:', {
           surahNumber: result.surah?.number,
@@ -166,6 +200,18 @@ export default function HomeScreen() {
 
         // Mark that match was found
         matchFoundRef.current = true;
+
+        // Increment usage counter AFTER successful recognition
+        try {
+          await usageValidator.incrementUsage();
+          console.log('✅ Usage incremented');
+
+          // Reload usage stats to update UI
+          await loadUsageStats();
+        } catch (error) {
+          console.error('Error incrementing usage:', error);
+          // Don't block navigation on usage tracking error
+        }
 
         // Clear processing state
         setProcessing(false);
@@ -240,6 +286,18 @@ export default function HomeScreen() {
     startRecording();
   };
 
+  const handleUpgrade = () => {
+    setShowUpgradePrompt(false);
+    // TODO: Navigate to auth/subscription screen
+    // For now, just log
+    console.log('Upgrade button pressed');
+    Alert.alert(
+      'Coming Soon',
+      'Sign up and subscription features will be available soon!',
+      [{ text: 'OK' }]
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.content}>
@@ -251,6 +309,23 @@ export default function HomeScreen() {
           <Text variant="body" color={COLORS.text.secondary} align="center">
             Identify Quran recitations instantly
           </Text>
+
+          {/* Usage Counter */}
+          {usageStats && (
+            <View style={styles.usageCounter}>
+              <Ionicons
+                name="flash-outline"
+                size={16}
+                color={usageStats.remaining === 0 ? COLORS.error[500] : COLORS.primary[500]}
+              />
+              <Text
+                variant="caption"
+                color={usageStats.remaining === 0 ? COLORS.error[500] : COLORS.primary[500]}
+              >
+                {usageStats.remaining}/{usageStats.limit} searches {usageStats.period === 'daily' ? 'today' : 'this month'}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Listen Button */}
@@ -302,6 +377,19 @@ export default function HomeScreen() {
           )}
         </View>
       </View>
+
+      {/* Upgrade Prompt Modal */}
+      {usageStats && (
+        <UpgradePrompt
+          visible={showUpgradePrompt}
+          tier={usageStats.tier}
+          remaining={usageStats.remaining}
+          limit={usageStats.limit}
+          reason={upgradeReason}
+          onUpgrade={handleUpgrade}
+          onDismiss={() => setShowUpgradePrompt(false)}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -319,6 +407,23 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 24,
     gap: 8,
+  },
+  usageCounter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: COLORS.background.paper,
+    borderRadius: 20,
+    alignSelf: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   buttonContainer: {
     flex: 1,

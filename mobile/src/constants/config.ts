@@ -51,3 +51,31 @@ export const REALTIME_MATCHING_CONFIG = {
   SHOW_PARTIAL_MATCHES: true, // Show low-confidence matches in UI
   HAPTIC_FEEDBACK_ON_MATCH: true, // Vibrate when match found
 } as const;
+
+export const USAGE_LIMITS = {
+  ANONYMOUS: {
+    DAILY_SEARCHES: 2,
+    TIER: 'anonymous' as const,
+  },
+  FREE: {
+    DAILY_SEARCHES: 5,
+    TIER: 'free' as const,
+  },
+  PREMIUM: {
+    MONTHLY_SEARCHES: 100,
+    TIER: 'premium' as const,
+  },
+  // Reset times
+  DAILY_RESET_HOUR: 0, // Midnight UTC
+  MONTHLY_RESET_DAY: 1, // First day of billing cycle
+} as const;
+
+export const FIREBASE_CONFIG = {
+  // These will be populated from environment variables or Firebase config files
+  // For now, placeholders - will be set up during Firebase project creation
+  ENABLE_EMULATOR: __DEV__ && false, // Set to true for local development
+  EMULATOR_HOST: 'localhost',
+  AUTH_EMULATOR_PORT: 9099,
+  FIRESTORE_EMULATOR_PORT: 8080,
+  FUNCTIONS_EMULATOR_PORT: 5001,
+} as const;
