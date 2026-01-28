@@ -2,13 +2,14 @@
  * Quran List Screen
  * Displays list of all Surahs with HeroUI Native components
  */
-import React, { useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
   FlatList,
   Text as RNText,
   Pressable,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -16,17 +17,9 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/presentation/navigation/RootNavigator';
 import { Chip, Card } from 'heroui-native';
 import { Ionicons } from '@expo/vector-icons';
+import serverQuranService from '@/services/quran/ServerQuranService';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
-
-interface SurahData {
-  id: number;
-  name: string;
-  transliteration: string;
-  translation: string;
-  type: string;
-  total_verses: number;
-}
 
 interface Surah {
   number: number;
@@ -39,24 +32,57 @@ interface Surah {
 
 export default function QuranListScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const [surahs, setSurahs] = useState<Surah[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Map the data to expected format - lazy load JSON
-  const surahs: Surah[] = useMemo(() => {
-    try {
-      const surahsData = require('@/data/quran/quran-surah-english.json');
-      return (surahsData as SurahData[]).map(surah => ({
-        number: surah.id,
-        name: surah.name,
-        englishName: surah.transliteration,
-        englishNameTranslation: surah.translation,
-        revelationType: surah.type,
-        numberOfAyahs: surah.total_verses,
-      }));
-    } catch (error) {
-      console.error('Failed to load Quran surah data:', error);
-      return [];
-    }
+  useEffect(() => {
+    loadSurahs();
   }, []);
+
+  const loadSurahs = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Force clear cache once to get fresh data from server (fixes stale 1-surah cache)
+      console.log('[Quran] Clearing cache to force fresh data...');
+      await serverQuranService.clearCache();
+
+      const data = await serverQuranService.getAllSurahs();
+      setSurahs(data);
+    } catch (err: any) {
+      console.error('Failed to load Quran surah data:', err);
+      setError(err.message || 'Failed to load surahs');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+          <RNText style={styles.loadingText}>Loading Surahs...</RNText>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={48} color="#ef4444" />
+          <RNText style={styles.errorText}>{error}</RNText>
+          <Pressable onPress={loadSurahs} style={styles.retryButton}>
+            <RNText style={styles.retryText}>Retry</RNText>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const renderSurahCard = ({ item }: { item: Surah }) => (
     <Pressable
@@ -67,7 +93,7 @@ export default function QuranListScreen() {
         })
       }
     >
-      <Card variant="outlined" style={styles.card}>
+      <Card style={styles.card}>
         <Card.Body>
           <View style={styles.cardContent}>
             {/* Surah Number Badge */}
@@ -114,8 +140,17 @@ export default function QuranListScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <RNText style={styles.title}>القرآن الكريم</RNText>
-        <RNText style={styles.subtitle}>The Holy Quran</RNText>
+        <View style={styles.topRow}>
+          <View style={{ width: 40 }} />
+          <RNText style={styles.title}>Holy Quran</RNText>
+          <Pressable
+            onPress={() => navigation.navigate('Profile' as any)}
+            style={styles.profileButton}
+          >
+            <Ionicons name="person-circle-outline" size={32} color="#4CAF50" />
+          </Pressable>
+        </View>
+        <RNText style={styles.subtitle}>Read and explore the verses</RNText>
       </View>
 
       {/* Surah List */}
@@ -144,7 +179,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: '700',
-    color: '#111827',
+    color: '#1B5E20',
     marginBottom: 4,
     textAlign: 'center',
   },
@@ -157,6 +192,15 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 80,
   },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  profileButton: {
+    padding: 4,
+  },
   card: {
     marginBottom: 12,
   },
@@ -168,7 +212,7 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#dbeafe',
+    backgroundColor: '#E8F5E9',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
@@ -176,7 +220,7 @@ const styles = StyleSheet.create({
   numberText: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1e40af',
+    color: '#2E7D32',
   },
   infoContainer: {
     flex: 1,
@@ -200,5 +244,40 @@ const styles = StyleSheet.create({
   ayahCount: {
     fontSize: 13,
     color: '#9ca3af',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#6b7280',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#ef4444',
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    backgroundColor: '#4CAF50',
+    borderRadius: 8,
+  },
+  retryText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

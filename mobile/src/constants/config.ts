@@ -1,12 +1,10 @@
-/**
- * Application Configuration
- * Environment-specific settings
- */
+import { API_BASE_URL } from '@env';
 
 export const API_CONFIG = {
-  BASE_URL: __DEV__
-    ? 'http://localhost:3000/api'
-    : 'https://api.ayahfinder.com/api',
+  BASE_URL: (
+    API_BASE_URL ||
+    (__DEV__ ? 'http://localhost:3000/api' : 'https://api.ayahfinder.com/api')
+  ).replace(/\/?$/, '/'),
   TIMEOUT: 30000, // 30 seconds
   RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 1000, // 1 second

@@ -1,16 +1,14 @@
 /**
  * Real-Time Recognition Hook
  * Handles continuous audio recognition with auto-navigation
- * NOTE: Progressive matching temporarily disabled for debugging
+ * NOTE: Server-based version processes full audio instead of chunks
  */
 import { useState, useRef, useCallback } from 'react';
+import serverRecognitionService from '@/services/recognition/ServerRecognitionService';
 import { RecognitionResult } from '@/domain/entities/RecognitionResult';
-import { RecognizeAudioUseCase } from '@/domain/usecases/RecognizeAudioUseCase';
-import { RecognitionRepositoryImpl } from '@/data/repositories/RecognitionRepositoryImpl';
-import { RecognitionApiDataSource } from '@/data/datasources/remote/RecognitionApiDataSource';
+import serverUsageService from '@/services/usage/ServerUsageService';
 import { AudioChunk } from '@/services/audio/types';
 import { REALTIME_MATCHING_CONFIG } from '@/constants/config';
-// import * as Haptics from 'expo-haptics';
 
 interface PartialMatch {
   surahNumber: number;
@@ -39,56 +37,50 @@ export function useRealTimeRecognition(): UseRealTimeRecognitionReturn {
   const [partialMatches, setPartialMatches] = useState<PartialMatch[]>([]);
   const [chunksSent, setChunksSent] = useState(0);
 
-  // Refs for callbacks and API
-  const isMatchingRef = useRef(false); // Use ref for immediate updates
+  // Refs for callbacks and state
+  const isMatchingRef = useRef(false);
   const onMatchCallback = useRef<((result: RecognitionResult) => void) | null>(
     null
   );
   const pendingRequests = useRef<Set<number>>(new Set());
-  const recognizeUseCase = useRef(
-    new RecognizeAudioUseCase(
-      new RecognitionRepositoryImpl(new RecognitionApiDataSource())
-    )
-  );
+  const lastProcessedChunk = useRef<number>(0);
 
   /**
    * Start real-time matching
    */
   const startMatching = useCallback(
     (onMatch: (result: RecognitionResult) => void) => {
-      isMatchingRef.current = true; // Set ref immediately
+      isMatchingRef.current = true;
       setIsMatching(true);
       setMatchingConfidence(0);
       setPartialMatches([]);
       setChunksSent(0);
+      lastProcessedChunk.current = 0;
       onMatchCallback.current = onMatch;
       pendingRequests.current.clear();
 
-      console.log('🎙️ Started recognition session');
+      console.log('🎙️ Started real-time recognition session');
     },
     []
   );
 
   /**
    * Stop real-time matching
-   * NOTE: We don't clear the callback here - let pending requests finish
-   * Callback will be replaced when starting a new session
    */
   const stopMatching = useCallback(() => {
-    console.log('🛑 stopMatching called - stopping new chunks only');
-    isMatchingRef.current = false; // Clear ref immediately to prevent new chunks
+    console.log('🛑 Stopping real-time recognition');
+    isMatchingRef.current = false;
     setIsMatching(false);
-    // DON'T clear callback or pending requests - let them complete
-    // pendingRequests.current.clear();
   }, []);
 
   /**
    * Process an audio chunk
+   * Note: Server processes full audio file, not streaming chunks
    */
   const processChunk = useCallback(
     async (chunk: AudioChunk) => {
       if (!isMatchingRef.current) {
-        console.log(`⚠️ Skipping chunk ${chunk.chunkIndex} - not matching (isMatchingRef = false)`);
+        console.log(`⚠️ Skipping chunk ${chunk.chunkIndex} - not matching`);
         return;
       }
 
@@ -103,58 +95,64 @@ export function useRealTimeRecognition(): UseRealTimeRecognitionReturn {
         return;
       }
 
+      // Skip if we've already processed a recent chunk (rate limiting)
+      const now = Date.now();
+      if (
+        lastProcessedChunk.current &&
+        now - lastProcessedChunk.current < 5000
+      ) {
+        console.log(`Skipping chunk ${chunk.chunkIndex} - rate limited (5s)`);
+        return;
+      }
+
       const chunkId = chunk.chunkIndex;
       pendingRequests.current.add(chunkId);
       setChunksSent(prev => prev + 1);
+      lastProcessedChunk.current = now;
 
       try {
         console.log(
           `Processing chunk ${chunk.chunkIndex} (${chunk.duration}ms)`
         );
 
-        // Convert AudioChunk to AudioRecording format for the use case
-        const audioRecording = {
-          audioUri: chunk.uri,
-          duration: chunk.duration,
-          format: chunk.format,
-        };
+        // Check usage before sending
+        const usageCheck = await serverUsageService.canPerformSearch();
+        if (!usageCheck.allowed) {
+          console.log('Usage limit reached');
+          pendingRequests.current.delete(chunkId);
+          stopMatching();
+          return;
+        }
 
-        // Call recognition API with timeout
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(
-            () => reject(new Error('Chunk timeout')),
-            REALTIME_MATCHING_CONFIG.REQUEST_TIMEOUT
-          )
-        );
-
-        const result = (await Promise.race([
-          recognizeUseCase.current.execute(audioRecording),
-          timeoutPromise,
-        ])) as RecognitionResult;
+        // Send audio to server for recognition
+        const result = await serverRecognitionService.recognizeAudio(chunk.uri);
 
         // Remove from pending
         pendingRequests.current.delete(chunkId);
 
-        if (!result.success || !result.ayah) {
+        if (!result.success || !result.match) {
           console.log(`Chunk ${chunk.chunkIndex}: No match`);
           setMatchingConfidence(0);
           return;
         }
 
-        const confidence = result.confidence;
+        const confidence = result.match.confidence;
         console.log(
-          `Chunk ${chunk.chunkIndex}: Match found - ${result.surah?.nameTransliteration} ${result.ayah?.ayahNumber} (${(confidence * 100).toFixed(1)}%)`
+          `Chunk ${chunk.chunkIndex}: Match found - Surah ${result.match.surahNumber}, Ayah ${result.match.ayahNumber} (${confidence}%)`
         );
 
         // Update confidence display
-        setMatchingConfidence(Math.round(confidence * 100));
+        setMatchingConfidence(confidence);
 
         // Track partial match
-        if (confidence >= REALTIME_MATCHING_CONFIG.MIN_CONFIDENCE_TO_SHOW) {
+        if (
+          confidence >=
+          REALTIME_MATCHING_CONFIG.MIN_CONFIDENCE_TO_SHOW * 100
+        ) {
           const partialMatch: PartialMatch = {
-            surahNumber: result.surah?.number || 0,
-            ayahNumber: result.ayah?.ayahNumber || 0,
-            confidence,
+            surahNumber: result.match.surahNumber,
+            ayahNumber: result.match.ayahNumber,
+            confidence: confidence / 100,
             timestamp: Date.now(),
           };
 
@@ -162,24 +160,48 @@ export function useRealTimeRecognition(): UseRealTimeRecognitionReturn {
         }
 
         // Check if confidence meets threshold for auto-navigation
-        if (confidence >= REALTIME_MATCHING_CONFIG.CONFIDENCE_THRESHOLD) {
-          console.log('✅ MATCH FOUND - Auto-navigating!');
-          console.log('🔔 Callback exists?', !!onMatchCallback.current);
+        if (confidence >= REALTIME_MATCHING_CONFIG.CONFIDENCE_THRESHOLD * 100) {
+          console.log('✅ MATCH FOUND - Mapping to Domain Entity...');
+
+          // Map Server DTO to Domain Entity
+          const domainResult = {
+            success: true,
+            isAmbiguous: false,
+            confidence: confidence / 100,
+            processingTimeMs: result.processingTimeMs,
+            surah: {
+              id: result.match.surahNumber,
+              number: result.match.surahNumber,
+              nameArabic: result.verse?.surahNameArabic || '',
+              nameEnglish: result.verse?.surahTranslation || '',
+              nameTransliteration: result.verse?.surahName || '',
+              revelationType: (result.verse?.surahType?.toLowerCase() ===
+              'medinan'
+                ? 'medinan'
+                : 'meccan') as any,
+              ayahCount: 0, // Not provided by recognition API
+            },
+            ayah: {
+              id: 0,
+              surahId: result.match.surahNumber,
+              surahNumber: result.match.surahNumber,
+              ayahNumber: result.match.ayahNumber,
+              textArabic: result.verse?.arabicText || '',
+              juzNumber: 0,
+              pageNumber: 0,
+            },
+          };
+
           console.log('📍 Match details:', {
-            surah: result.surah?.number,
-            ayah: result.ayah?.ayahNumber,
+            surah: domainResult.surah.number,
+            ayah: domainResult.ayah.ayahNumber,
             confidence: confidence,
           });
 
-          // Haptic feedback
-          // if (REALTIME_MATCHING_CONFIG.HAPTIC_FEEDBACK_ON_MATCH) {
-          //   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          // }
-
-          // Trigger callback
+          // Trigger callback with mapped domain entity
           if (onMatchCallback.current) {
             console.log('🚀 Calling onMatchCallback...');
-            onMatchCallback.current(result);
+            onMatchCallback.current(domainResult as RecognitionResult);
             console.log('✅ Callback executed');
           } else {
             console.error('❌ No callback registered!');
@@ -190,10 +212,15 @@ export function useRealTimeRecognition(): UseRealTimeRecognitionReturn {
             stopMatching();
           }
         }
-      } catch (error) {
+      } catch (error: any) {
         pendingRequests.current.delete(chunkId);
         console.error(`Error processing chunk ${chunk.chunkIndex}:`, error);
-        // Continue matching even on error
+
+        // If usage limit reached, stop matching
+        if (error.code === 'recognition/limit-reached') {
+          stopMatching();
+        }
+        // Continue matching on other errors
       }
     },
     [stopMatching]
@@ -207,6 +234,7 @@ export function useRealTimeRecognition(): UseRealTimeRecognitionReturn {
     setMatchingConfidence(0);
     setPartialMatches([]);
     setChunksSent(0);
+    lastProcessedChunk.current = 0;
     onMatchCallback.current = null;
     pendingRequests.current.clear();
   }, []);

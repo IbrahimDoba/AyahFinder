@@ -3,10 +3,17 @@
  * HTTP client with retry logic and interceptors
  */
 import axios, { AxiosInstance, AxiosError } from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_CONFIG } from '@/constants/config';
+
+// Storage keys
+const AUTH_TOKEN_KEY = '@ayahfinder:authToken';
+const DEVICE_ID_KEY = '@ayahfinder:deviceId';
 
 class ApiClient {
   private client: AxiosInstance;
+  private deviceId: string | null = null;
+  private authToken: string | null = null;
 
   constructor() {
     this.client = axios.create({
@@ -17,18 +24,78 @@ class ApiClient {
       },
     });
 
+    this.initializeDeviceId();
+    this.loadAuthToken();
     this.setupInterceptors();
+  }
+
+  /**
+   * Initialize or retrieve device ID for anonymous tracking
+   */
+  private async initializeDeviceId(): Promise<void> {
+    try {
+      let deviceId = await AsyncStorage.getItem(DEVICE_ID_KEY);
+      if (!deviceId) {
+        deviceId = `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        await AsyncStorage.setItem(DEVICE_ID_KEY, deviceId);
+      }
+      this.deviceId = deviceId;
+    } catch (error) {
+      console.error('[API] Failed to initialize device ID:', error);
+    }
+  }
+
+  /**
+   * Load auth token from storage
+   */
+  private async loadAuthToken(): Promise<void> {
+    try {
+      const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+      this.authToken = token;
+    } catch (error) {
+      console.error('[API] Failed to load auth token:', error);
+    }
+  }
+
+  /**
+   * Set auth token (called after login)
+   */
+  async setAuthToken(token: string | null): Promise<void> {
+    this.authToken = token;
+    if (token) {
+      await AsyncStorage.setItem(AUTH_TOKEN_KEY, token);
+    } else {
+      await AsyncStorage.removeItem(AUTH_TOKEN_KEY);
+    }
+  }
+
+  /**
+   * Get current auth token
+   */
+  getAuthToken(): string | null {
+    return this.authToken;
+  }
+
+  /**
+   * Get device ID
+   */
+  getDeviceId(): string | null {
+    return this.deviceId;
   }
 
   private setupInterceptors() {
     // Request interceptor
     this.client.interceptors.request.use(
-      config => {
+      async config => {
         // Add auth token if available
-        // const token = getAuthToken();
-        // if (token) {
-        //   config.headers.Authorization = `Bearer ${token}`;
-        // }
+        if (this.authToken) {
+          config.headers.Authorization = `Bearer ${this.authToken}`;
+        }
+
+        // Add device ID for anonymous tracking
+        if (this.deviceId) {
+          config.headers['x-device-id'] = this.deviceId;
+        }
 
         if (__DEV__) {
           console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`);
@@ -46,6 +113,21 @@ class ApiClient {
       response => response,
       async (error: AxiosError) => {
         const config = error.config;
+
+        // Handle 401 Unauthorized - token expired or invalid
+        if (error.response?.status === 401 && config) {
+          // Clear auth token
+          await this.setAuthToken(null);
+
+          // Don't retry auth endpoints to avoid infinite loops
+          const url = config.url || '';
+          if (url.includes('/auth/')) {
+            return Promise.reject(error);
+          }
+
+          // For other endpoints, reject and let the app handle logout
+          return Promise.reject(error);
+        }
 
         // Retry logic for network errors
         if (this.shouldRetry(error) && config) {

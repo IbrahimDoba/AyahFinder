@@ -15,20 +15,20 @@ import { RecognitionResult } from '@/domain/entities/RecognitionResult';
 import { Text } from '@/presentation/components/common/Text';
 import { ListenButton } from './components/ListenButton';
 import { useRecognitionStore } from '@/presentation/store/recognitionStore';
+import { useAuthStore } from '@/presentation/store/authStore';
 import { AudioRecorder } from '@/services/audio/AudioRecorder';
-import { useRecognition } from '@/presentation/hooks/useRecognition';
 import { useRealTimeRecognition } from '@/presentation/hooks/useRealTimeRecognition';
-import usageValidator from '@/services/usage/UsageValidator';
+import serverUsageService from '@/services/usage/ServerUsageService';
 import { UpgradePrompt } from '@/presentation/components/usage/UpgradePrompt';
-import type { UsageStats } from '@/services/usage/UsageValidator';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function HomeScreen() {
   const navigation = useNavigation<NavigationProp>();
   const audioRecorder = useState(() => new AudioRecorder())[0];
-  const { isRecording, setRecording, isProcessing, setProcessing } = useRecognitionStore();
-  const { recognize } = useRecognition();
+  const { isRecording, setRecording, isProcessing, setProcessing } =
+    useRecognitionStore();
+  const { user } = useAuthStore();
 
   // Refs to prevent multiple stop calls and track match state
   const isStoppingRef = useRef(false);
@@ -36,33 +36,26 @@ export default function HomeScreen() {
   const [showRetry, setShowRetry] = useState(false);
 
   // Usage tracking state
-  const [usageStats, setUsageStats] = useState<UsageStats | null>(null);
+  const [usageStats, setUsageStats] = useState<any | null>(null);
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const [upgradeReason, setUpgradeReason] = useState<string>('');
 
-  // Load usage stats on mount
+  // Load usage stats on mount and when auth state changes
   useEffect(() => {
     loadUsageStats();
-  }, []);
+  }, [user]);
 
   const loadUsageStats = async () => {
     try {
-      const stats = await usageValidator.getUsageStats();
+      const stats = await serverUsageService.getUsageStats();
       setUsageStats(stats);
     } catch (error) {
       console.error('Error loading usage stats:', error);
     }
   };
 
-  const {
-    isMatching,
-    matchingConfidence,
-    chunksSent,
-    startMatching,
-    stopMatching,
-    processChunk,
-    reset: resetRealTime,
-  } = useRealTimeRecognition();
+  const { startMatching, stopMatching, processChunk } =
+    useRealTimeRecognition();
 
   // Set up auto-stop callback
   useEffect(() => {
@@ -79,7 +72,7 @@ export default function HomeScreen() {
       // Check if recording is still active
       if (audioRecorder.isRecording()) {
         audioRecorder.disableChunking();
-        audioRecorder.stopChunkedRecording().catch((err) => {
+        audioRecorder.stopChunkedRecording().catch(err => {
           console.error('Error stopping recording on unmount:', err);
         });
       }
@@ -104,7 +97,7 @@ export default function HomeScreen() {
       console.log('🎙️ startRecording called');
 
       // Check usage limit FIRST (before recording)
-      const usageCheck = await usageValidator.canPerformSearch();
+      const usageCheck = await serverUsageService.canPerformSearch();
 
       if (!usageCheck.allowed) {
         console.log('❌ Usage limit reached');
@@ -113,7 +106,9 @@ export default function HomeScreen() {
         return;
       }
 
-      console.log(`✅ Usage check passed: ${usageCheck.remaining}/${usageCheck.limit} remaining`);
+      console.log(
+        `✅ Usage check passed: ${usageCheck.remaining}/${usageCheck.limit} remaining`
+      );
 
       // Reset states
       isStoppingRef.current = false;
@@ -203,7 +198,7 @@ export default function HomeScreen() {
 
         // Increment usage counter AFTER successful recognition
         try {
-          await usageValidator.incrementUsage();
+          await serverUsageService.incrementUsage();
           console.log('✅ Usage incremented');
 
           // Reload usage stats to update UI
@@ -260,23 +255,60 @@ export default function HomeScreen() {
 
       // Mark as stopping
       isStoppingRef.current = true;
-
-      // Set to false first to prevent multiple calls
       setRecording(false);
 
-      stopMatching();
+      // IMPORTANT: Stop the RECORDER hardware but don't stop the MATCHING hook yet
+      // so it can still process the final chunk we're about to give it.
       audioRecorder.disableChunking();
-      await audioRecorder.stopChunkedRecording();
 
-      console.log('🛑 Recording stopped manually');
+      // Stop recording and get the final chunk
+      const finalChunk = await audioRecorder.stopChunkedRecording();
 
-      // Reset stopping flag
+      if (finalChunk && finalChunk.duration >= 500) {
+        console.log(
+          `🚀 Manual stop: processing final chunk (${finalChunk.duration}ms)`
+        );
+        setProcessing(true);
+        try {
+          // Call processChunk while matching is still "active" in the hook
+          await processChunk(finalChunk);
+
+          // NOW stop matching to prevent any other late results
+          stopMatching();
+
+          // Wait a bit for the navigation callback to execute if a match was found
+          setTimeout(() => {
+            if (!matchFoundRef.current) {
+              console.log('⏱️ No match found after manual stop');
+              setProcessing(false);
+              setShowRetry(true);
+              Alert.alert(
+                'No Match Found',
+                'Could not identify the recitation. Please try again with a clearer audio.',
+                [{ text: 'OK' }]
+              );
+            }
+          }, 2000);
+        } catch (error) {
+          console.error('❌ Error processing final chunk:', error);
+          stopMatching();
+          setProcessing(false);
+          setShowRetry(true);
+        }
+      } else {
+        console.log('⏹️ Recording stopped (no chunk or too short)');
+        stopMatching();
+        setProcessing(false);
+      }
+
+      // Reset stopping flag after a delay
       setTimeout(() => {
         isStoppingRef.current = false;
       }, 500);
     } catch (error: any) {
       console.error('Stop recording error:', error);
       isStoppingRef.current = false;
+      setProcessing(false);
     }
   };
 
@@ -303,10 +335,27 @@ export default function HomeScreen() {
       <View style={styles.content}>
         {/* Header */}
         <View style={styles.header}>
-          <Text variant="h1" align="center">
-            Ayahfinder
-          </Text>
-          <Text variant="body" color={COLORS.text.secondary} align="center">
+          <View style={styles.topRow}>
+            <View style={{ width: 40 }} />
+            <Text
+              variant="h1"
+              align="center"
+              style={{ color: COLORS.primary[900] }}
+            >
+              Ayahfinder
+            </Text>
+            <Pressable
+              onPress={() => navigation.navigate('Profile' as any)}
+              style={styles.profileButton}
+            >
+              <Ionicons
+                name="person-circle-outline"
+                size={32}
+                color={COLORS.primary[600]}
+              />
+            </Pressable>
+          </View>
+          <Text variant="body" color={COLORS.primary[700]} align="center">
             Identify Quran recitations instantly
           </Text>
 
@@ -316,13 +365,21 @@ export default function HomeScreen() {
               <Ionicons
                 name="flash-outline"
                 size={16}
-                color={usageStats.remaining === 0 ? COLORS.error[500] : COLORS.primary[500]}
+                color={
+                  usageStats.remaining === 0
+                    ? COLORS.error[500]
+                    : COLORS.primary[500]
+                }
               />
               <Text
                 variant="caption"
-                color={usageStats.remaining === 0 ? COLORS.error[500] : COLORS.primary[500]}
+                color={
+                  usageStats.remaining === 0
+                    ? COLORS.error[500]
+                    : COLORS.primary[500]
+                }
               >
-                {usageStats.remaining}/{usageStats.limit} searches {usageStats.period === 'daily' ? 'today' : 'this month'}
+                {`${usageStats.remaining}/${usageStats.limit} searches ${usageStats.period === 'daily' ? 'today' : 'this month'}`}
               </Text>
             </View>
           )}
@@ -350,11 +407,7 @@ export default function HomeScreen() {
         {/* Instructions */}
         <View style={styles.instructions}>
           {isProcessing ? (
-            <Text
-              variant="body"
-              align="center"
-              color={COLORS.primary[500]}
-            >
+            <Text variant="body" align="center" color={COLORS.primary[500]}>
               Processing audio...
             </Text>
           ) : (
@@ -371,7 +424,7 @@ export default function HomeScreen() {
                 align="center"
                 color={COLORS.text.secondary}
               >
-                Recording will auto-stop after {REALTIME_MATCHING_CONFIG.CHUNK_INTERVAL / 1000} seconds
+                {`Recording will auto-stop after ${REALTIME_MATCHING_CONFIG.CHUNK_INTERVAL / 1000} seconds`}
               </Text>
             </>
           )}
@@ -408,6 +461,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     gap: 8,
   },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  profileButton: {
+    padding: 4,
+  },
   usageCounter: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -416,7 +477,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingVertical: 8,
     paddingHorizontal: 16,
-    backgroundColor: COLORS.background.paper,
+    backgroundColor: '#E8F5E9',
     borderRadius: 20,
     alignSelf: 'center',
     shadowColor: '#000',
@@ -441,7 +502,7 @@ const styles = StyleSheet.create({
     marginTop: 24,
     paddingVertical: 12,
     paddingHorizontal: 24,
-    backgroundColor: COLORS.background.paper,
+    backgroundColor: '#E8F5E9',
     borderRadius: 24,
     borderWidth: 2,
     borderColor: COLORS.primary[500],

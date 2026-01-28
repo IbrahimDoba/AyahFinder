@@ -3,15 +3,23 @@
  * Email/password authentication
  */
 import React, { useState } from 'react';
-import { View, StyleSheet, TextInput, TouchableOpacity, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '../../components/common/Text';
 import { HeroButton } from '../../components/common/HeroButton';
-import { SocialAuthButtons } from '../../components/auth/SocialAuthButtons';
-import { COLORS } from '../../../constants';
+import { COLORS } from '@/constants/colors';
 import { RootStackParamList } from '../../navigation/RootNavigator';
 import { useAuthStore } from '../../store/authStore';
 
@@ -46,8 +54,8 @@ export default function LoginScreen() {
       setPasswordError('Password is required');
       return false;
     }
-    if (password.length < 6) {
-      setPasswordError('Password must be at least 6 characters');
+    if (password.length < 8) {
+      setPasswordError('Password must be at least 8 characters');
       return false;
     }
     setPasswordError('');
@@ -67,30 +75,21 @@ export default function LoginScreen() {
 
     try {
       await signIn(email.trim(), password);
-      // Navigation will be handled automatically by RootNavigator based on auth state
+      // Navigation will be handled automatically by RootNavigator based on auth state,
+      // but we explicitly navigate to Tabs to ensure the UI refreshes
+      navigation.navigate('Tabs' as any);
     } catch (error: any) {
       console.error('Login error:', error);
-      Alert.alert('Login Failed', error.message || 'Please check your credentials and try again.');
+      Alert.alert(
+        'Login Failed',
+        error.message || 'Please check your credentials and try again.'
+      );
     }
   };
 
   const handleForgotPassword = () => {
-    if (!email) {
-      Alert.alert('Email Required', 'Please enter your email address to reset your password.');
-      return;
-    }
-
-    if (!validateEmail(email)) {
-      Alert.alert('Invalid Email', 'Please enter a valid email address.');
-      return;
-    }
-
-    // TODO: Implement password reset
-    Alert.alert(
-      'Password Reset',
-      'Password reset functionality will be available soon. Please contact support if you need assistance.',
-      [{ text: 'OK' }]
-    );
+    // Navigate to ForgotPassword screen with pre-filled email
+    navigation.navigate('ForgotPassword' as any, { email: email.trim() });
   };
 
   return (
@@ -110,13 +109,21 @@ export default function LoginScreen() {
               style={styles.backButton}
               onPress={() => navigation.goBack()}
             >
-              <Ionicons name="arrow-back" size={24} color={COLORS.text.primary} />
+              <Ionicons
+                name="arrow-back"
+                size={24}
+                color={COLORS.text.primary}
+              />
             </TouchableOpacity>
 
             <Text variant="h2" style={styles.title}>
               Welcome Back
             </Text>
-            <Text variant="body" color={COLORS.text.secondary} style={styles.subtitle}>
+            <Text
+              variant="body"
+              color={COLORS.text.secondary}
+              style={styles.subtitle}
+            >
               Sign in to your account
             </Text>
           </View>
@@ -128,13 +135,20 @@ export default function LoginScreen() {
               <Text variant="body" style={styles.label}>
                 Email
               </Text>
-              <View style={[styles.inputWrapper, emailError && styles.inputError]}>
-                <Ionicons name="mail-outline" size={20} color={COLORS.text.secondary} style={styles.inputIcon} />
+              <View
+                style={[styles.inputWrapper, emailError && styles.inputError]}
+              >
+                <Ionicons
+                  name="mail-outline"
+                  size={20}
+                  color={COLORS.text.secondary}
+                  style={styles.inputIcon}
+                />
                 <TextInput
                   style={styles.input}
                   placeholder="your@email.com"
                   value={email}
-                  onChangeText={(text) => {
+                  onChangeText={text => {
                     setEmail(text);
                     if (emailError) validateEmail(text);
                   }}
@@ -157,13 +171,23 @@ export default function LoginScreen() {
               <Text variant="body" style={styles.label}>
                 Password
               </Text>
-              <View style={[styles.inputWrapper, passwordError && styles.inputError]}>
-                <Ionicons name="lock-closed-outline" size={20} color={COLORS.text.secondary} style={styles.inputIcon} />
+              <View
+                style={[
+                  styles.inputWrapper,
+                  passwordError && styles.inputError,
+                ]}
+              >
+                <Ionicons
+                  name="lock-closed-outline"
+                  size={20}
+                  color={COLORS.text.secondary}
+                  style={styles.inputIcon}
+                />
                 <TextInput
                   style={styles.input}
                   placeholder="Enter your password"
                   value={password}
-                  onChangeText={(text) => {
+                  onChangeText={text => {
                     setPassword(text);
                     if (passwordError) validatePassword(text);
                   }}
@@ -192,7 +216,10 @@ export default function LoginScreen() {
             </View>
 
             {/* Forgot Password */}
-            <TouchableOpacity onPress={handleForgotPassword} disabled={isLoading}>
+            <TouchableOpacity
+              onPress={handleForgotPassword}
+              disabled={isLoading}
+            >
               <Text variant="caption" color={COLORS.primary[500]} align="right">
                 Forgot password?
               </Text>
@@ -207,18 +234,6 @@ export default function LoginScreen() {
               disabled={isLoading}
               style={styles.signInButton}
             />
-
-            {/* Divider */}
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text variant="caption" color={COLORS.text.secondary} style={styles.dividerText}>
-                OR
-              </Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            {/* Social Sign In */}
-            <SocialAuthButtons mode="sign-in" />
           </View>
 
           {/* Sign Up Link */}
@@ -226,8 +241,15 @@ export default function LoginScreen() {
             <Text variant="body" color={COLORS.text.secondary} align="center">
               Don't have an account?{' '}
             </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('SignUp' as any)} disabled={isLoading}>
-              <Text variant="body" color={COLORS.primary[500]} style={styles.link}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('SignUp' as any)}
+              disabled={isLoading}
+            >
+              <Text
+                variant="body"
+                color={COLORS.primary[500]}
+                style={styles.link}
+              >
                 Sign Up
               </Text>
             </TouchableOpacity>
@@ -305,19 +327,6 @@ const styles = StyleSheet.create({
   },
   signInButton: {
     marginTop: 8,
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 8,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: COLORS.border.light,
-  },
-  dividerText: {
-    paddingHorizontal: 12,
   },
   footer: {
     flexDirection: 'row',

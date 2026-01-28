@@ -18,6 +18,7 @@ import SignUpScreen from '../screens/auth/SignUpScreen';
 import TabNavigator from './TabNavigator';
 import ResultScreen from '../screens/result/ResultScreen';
 import SurahScreen from '../screens/quran/SurahScreen';
+import ProfileScreen from '../screens/profile/ProfileScreen';
 import { Text } from '../components/common/Text';
 
 export type RootStackParamList = {
@@ -36,28 +37,10 @@ export type RootStackParamList = {
     highlightAyah?: number;
     fromRecognition?: boolean;
   };
+  Profile: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
-
-/**
- * Auth Stack
- * Screens shown when user is not authenticated
- */
-function AuthStack() {
-  return (
-    <Stack.Navigator
-      screenOptions={{
-        headerShown: false,
-        animation: 'slide_from_right',
-      }}
-    >
-      <Stack.Screen name="Welcome" component={WelcomeScreen} />
-      <Stack.Screen name="Login" component={LoginScreen} />
-      <Stack.Screen name="SignUp" component={SignUpScreen} />
-    </Stack.Navigator>
-  );
-}
 
 /**
  * Main App Stack
@@ -75,6 +58,9 @@ function MainAppStack() {
       <Stack.Screen name="Tabs" component={TabNavigator} />
       <Stack.Screen name="Result" component={ResultScreen} />
       <Stack.Screen name="Surah" component={SurahScreen} />
+      <Stack.Screen name="Profile" component={ProfileScreen} />
+      <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="SignUp" component={SignUpScreen} />
     </Stack.Navigator>
   );
 }
@@ -87,7 +73,11 @@ function LoadingScreen() {
   return (
     <View style={styles.loadingContainer}>
       <ActivityIndicator size="large" color={COLORS.primary[500]} />
-      <Text variant="body" color={COLORS.text.secondary} style={styles.loadingText}>
+      <Text
+        variant="body"
+        color={COLORS.text.secondary}
+        style={styles.loadingText}
+      >
         Loading...
       </Text>
     </View>

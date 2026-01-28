@@ -10,7 +10,6 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '../../components/common/Text';
 import { HeroButton } from '../../components/common/HeroButton';
-import { SocialAuthButtons } from '../../components/auth/SocialAuthButtons';
 import { COLORS } from '../../../constants';
 import { RootStackParamList } from '../../navigation/RootNavigator';
 
@@ -25,14 +24,23 @@ export default function WelcomeScreen() {
         {/* Logo/Header Section */}
         <View style={styles.header}>
           <View style={styles.logoContainer}>
-            <Ionicons name="musical-notes" size={64} color={COLORS.primary[500]} />
+            <Ionicons
+              name="musical-notes"
+              size={64}
+              color={COLORS.primary[500]}
+            />
           </View>
 
           <Text variant="h1" align="center" style={styles.title}>
             Welcome to Ayahfinder
           </Text>
 
-          <Text variant="body" color={COLORS.text.secondary} align="center" style={styles.subtitle}>
+          <Text
+            variant="body"
+            color={COLORS.text.secondary}
+            align="center"
+            style={styles.subtitle}
+          >
             Identify Quran recitations instantly with audio recognition
           </Text>
         </View>
@@ -40,7 +48,11 @@ export default function WelcomeScreen() {
         {/* Features List */}
         <View style={styles.features}>
           <View style={styles.featureItem}>
-            <Ionicons name="mic-outline" size={24} color={COLORS.primary[500]} />
+            <Ionicons
+              name="mic-outline"
+              size={24}
+              color={COLORS.primary[500]}
+            />
             <View style={styles.featureText}>
               <Text variant="body" style={styles.featureTitle}>
                 Audio Recognition
@@ -52,7 +64,11 @@ export default function WelcomeScreen() {
           </View>
 
           <View style={styles.featureItem}>
-            <Ionicons name="flash-outline" size={24} color={COLORS.primary[500]} />
+            <Ionicons
+              name="flash-outline"
+              size={24}
+              color={COLORS.primary[500]}
+            />
             <View style={styles.featureText}>
               <Text variant="body" style={styles.featureTitle}>
                 Free Daily Searches
@@ -64,7 +80,11 @@ export default function WelcomeScreen() {
           </View>
 
           <View style={styles.featureItem}>
-            <Ionicons name="cloud-outline" size={24} color={COLORS.primary[500]} />
+            <Ionicons
+              name="cloud-outline"
+              size={24}
+              color={COLORS.primary[500]}
+            />
             <View style={styles.featureText}>
               <Text variant="body" style={styles.featureTitle}>
                 Sync Across Devices
@@ -78,18 +98,6 @@ export default function WelcomeScreen() {
 
         {/* Action Buttons */}
         <View style={styles.actions}>
-          {/* Social Authentication */}
-          <SocialAuthButtons mode="sign-up" />
-
-          {/* Divider */}
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text variant="caption" color={COLORS.text.secondary} style={styles.dividerText}>
-              OR
-            </Text>
-            <View style={styles.dividerLine} />
-          </View>
-
           <HeroButton
             title="Create Account with Email"
             variant="primary"
@@ -106,7 +114,11 @@ export default function WelcomeScreen() {
 
           {/* Skip for now */}
           <View style={styles.skipContainer}>
-            <Text variant="caption" color={COLORS.text.secondary} align="center">
+            <Text
+              variant="caption"
+              color={COLORS.text.secondary}
+              align="center"
+            >
               Want to try it first?{' '}
             </Text>
             <HeroButton

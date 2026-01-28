@@ -7,7 +7,8 @@ import React from 'react';
 import { View, StyleSheet, Modal } from 'react-native';
 import { Text } from '../common/Text';
 import { HeroButton } from '../common/HeroButton';
-import type { SubscriptionTier } from '../../../services/usage/UsageValidator';
+
+type SubscriptionTier = 'anonymous' | 'free' | 'premium';
 
 interface UpgradePromptProps {
   visible: boolean;
@@ -22,30 +23,35 @@ interface UpgradePromptProps {
 /**
  * Get upgrade message based on current tier
  */
-const getUpgradeMessage = (tier: SubscriptionTier): { title: string; message: string; buttonText: string } => {
+const getUpgradeMessage = (
+  tier: SubscriptionTier
+): { title: string; message: string; buttonText: string } => {
   switch (tier) {
     case 'anonymous':
       return {
         title: 'Daily Limit Reached',
-        message: 'You\'ve used your 2 free searches today. Sign up to get 5 searches per day!',
+        message:
+          "You've used your 2 free searches today. Sign up to get 5 searches per day!",
         buttonText: 'Sign Up for Free',
       };
     case 'free':
       return {
         title: 'Daily Limit Reached',
-        message: 'You\'ve used your 5 searches today. Upgrade to Premium for 100 searches per month!',
+        message:
+          "You've used your 5 searches today. Upgrade to Premium for 100 searches per month!",
         buttonText: 'Upgrade to Premium',
       };
     case 'premium':
       return {
         title: 'Monthly Limit Reached',
-        message: 'You\'ve used all 100 searches this month. Your limit will reset on your next billing date.',
+        message:
+          "You've used all 100 searches this month. Your limit will reset on your next billing date.",
         buttonText: 'View Account',
       };
     default:
       return {
         title: 'Limit Reached',
-        message: 'You\'ve reached your search limit.',
+        message: "You've reached your search limit.",
         buttonText: 'OK',
       };
   }

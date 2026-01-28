@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
   ViewStyle,
 } from 'react-native';
-import { COLORS, TYPOGRAPHY } from '@/constants';
+import { COLORS } from '@/constants';
 
 interface ButtonProps {
   title: string;
@@ -20,6 +20,7 @@ interface ButtonProps {
   disabled?: boolean;
   loading?: boolean;
   style?: ViewStyle;
+  icon?: React.ReactNode;
 }
 
 export function Button({
@@ -30,6 +31,7 @@ export function Button({
   disabled = false,
   loading = false,
   style,
+  icon,
 }: ButtonProps) {
   const buttonStyles = [
     styles.button,
@@ -55,10 +57,15 @@ export function Button({
     >
       {loading ? (
         <ActivityIndicator
-          color={variant === 'primary' ? COLORS.neutral[0] : COLORS.primary[500]}
+          color={
+            variant === 'primary' ? COLORS.neutral[0] : COLORS.primary[500]
+          }
         />
       ) : (
-        <Text style={textStyles}>{title}</Text>
+        <>
+          {icon}
+          <Text style={textStyles}>{title}</Text>
+        </>
       )}
     </TouchableOpacity>
   );
@@ -66,7 +73,7 @@ export function Button({
 
 const styles = StyleSheet.create({
   button: {
-    borderRadius: 12,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
@@ -75,14 +82,21 @@ const styles = StyleSheet.create({
   // Variants
   button_primary: {
     backgroundColor: COLORS.primary[500],
+    shadowColor: COLORS.primary[500],
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
   },
   button_secondary: {
-    backgroundColor: COLORS.secondary[500],
-  },
-  button_outline: {
     backgroundColor: 'transparent',
     borderWidth: 2,
     borderColor: COLORS.primary[500],
+  },
+  button_outline: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: COLORS.border.light,
   },
 
   // Sizes
@@ -91,42 +105,47 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   button_medium: {
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 24,
   },
   button_large: {
-    paddingVertical: 16,
+    paddingVertical: 18,
     paddingHorizontal: 32,
   },
 
   // States
   button_disabled: {
     opacity: 0.5,
+    backgroundColor: COLORS.neutral[200],
+    borderColor: COLORS.neutral[200],
+    elevation: 0,
+    shadowOpacity: 0,
   },
 
   // Text
   text: {
-    fontWeight: TYPOGRAPHY.weights.semibold,
+    fontWeight: '700',
+    fontSize: 16,
   },
   text_primary: {
     color: COLORS.neutral[0],
   },
   text_secondary: {
-    color: COLORS.text.primary,
+    color: COLORS.primary[600],
   },
   text_outline: {
-    color: COLORS.primary[500],
+    color: COLORS.text.primary,
   },
   text_small: {
-    fontSize: TYPOGRAPHY.sizes.sm,
+    fontSize: 14,
   },
   text_medium: {
-    fontSize: TYPOGRAPHY.sizes.md,
+    fontSize: 16,
   },
   text_large: {
-    fontSize: TYPOGRAPHY.sizes.lg,
+    fontSize: 18,
   },
   text_disabled: {
-    opacity: 0.5,
+    color: COLORS.text.secondary,
   },
 });

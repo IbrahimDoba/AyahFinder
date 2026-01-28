@@ -17,17 +17,14 @@ import { Text } from '@/presentation/components/common/Text';
 import { COLORS } from '@/constants';
 import { Ionicons } from '@expo/vector-icons';
 
+import serverQuranService from '@/services/quran/ServerQuranService';
+
 type Props = NativeStackScreenProps<RootStackParamList, 'Surah'>;
 
-interface Ayah {
-  number: number;
-  text: string;
-  numberInSurah: number;
-}
-
 export default function SurahScreen({ navigation, route }: Props) {
-  const { surahNumber, surahName, highlightAyah, fromRecognition } = route.params;
-  const [ayahs, setAyahs] = useState<Ayah[]>([]);
+  const { surahNumber, surahName, highlightAyah, fromRecognition } =
+    route.params;
+  const [ayahs, setAyahs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Refs for auto-scroll
@@ -39,64 +36,49 @@ export default function SurahScreen({ navigation, route }: Props) {
 
   // Auto-scroll to highlighted ayah after loading
   useEffect(() => {
-    if (!loading && highlightAyah && fromRecognition && ayahs.length > 0) {
+    let timer: NodeJS.Timeout;
+    if (!loading && highlightAyah && ayahs.length > 0) {
       // Find the index of the ayah to scroll to
       const ayahIndex = ayahs.findIndex(
-        (ayah) => ayah.numberInSurah === highlightAyah
+        ayah => (ayah.numberInSurah || ayah.ayahNumber) === highlightAyah
       );
 
       if (ayahIndex !== -1) {
-        // Wait longer for FlatList to fully render and measure items
-        const timer = setTimeout(() => {
-          console.log(`📍 Scrolling to ayah ${highlightAyah} (index ${ayahIndex})`);
+        console.log(
+          `📍 Scrolling to ayah ${highlightAyah} (index ${ayahIndex})`
+        );
+        timer = setTimeout(() => {
           flatListRef.current?.scrollToIndex({
             index: ayahIndex,
             animated: true,
-            viewPosition: 0.2, // Scroll so the ayah appears at 20% from top
+            viewPosition: 0.2,
           });
-        }, 1000); // Increased delay for large lists
-
-        return () => clearTimeout(timer);
+        }, 800);
       }
     }
-  }, [loading, highlightAyah, fromRecognition, ayahs]);
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [loading, highlightAyah, ayahs]);
 
   const fetchSurahAyahs = async () => {
     try {
       setLoading(true);
-      console.log(`📖 Loading Surah ${surahNumber} from local JSON...`);
+      console.log(`📖 Loading Surah ${surahNumber} from server...`);
 
-      // Load from local JSON files
-      try {
-        const quranArabic = require('@/data/quran/quran-arabic.json');
-        console.log('✅ quran-arabic.json loaded successfully');
+      const surahData = await serverQuranService.getSurah(surahNumber);
 
-        const surahData = quranArabic[surahNumber.toString()];
-        console.log(`📊 Surah ${surahNumber} data:`, surahData ? `${surahData.length} verses` : 'Not found');
-
-        if (surahData && Array.isArray(surahData)) {
-          // Map to the expected format
-          const ayahsData = surahData.map((verse: any) => ({
-            number: verse.verse, // Global ayah number
-            text: verse.text,
-            numberInSurah: verse.verse, // Ayah number within this surah
-          }));
-
-          setAyahs(ayahsData);
-          console.log(`✅ Loaded ${ayahsData.length} ayahs for Surah ${surahNumber}`);
-        } else {
-          console.error(`No data found for Surah ${surahNumber}`);
-          setAyahs([]);
-        }
-      } catch (requireError) {
-        console.error('❌ Error requiring JSON file:', requireError);
-        throw requireError;
+      if (surahData && surahData.verses) {
+        setAyahs(surahData.verses);
+        console.log(
+          `✅ Loaded ${surahData.verses.length} verses for Surah ${surahNumber}`
+        );
+      } else {
+        console.error(`No verses found for Surah ${surahNumber}`);
+        setAyahs([]);
       }
     } catch (error) {
-      console.error('Error loading surah from local data:', error);
-      if (error instanceof Error) {
-        console.error('Error stack:', error.stack);
-      }
+      console.error('Error loading surah from server:', error);
       setAyahs([]);
     } finally {
       setLoading(false);
@@ -133,17 +115,17 @@ export default function SurahScreen({ navigation, route }: Props) {
         <FlatList
           ref={flatListRef}
           data={ayahs}
-          keyExtractor={(item) => item.number.toString()}
+          keyExtractor={item => item.number.toString()}
           style={styles.scrollView}
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
-          getItemLayout={(data, index) => ({
+          getItemLayout={(_, index) => ({
             length: 120, // Approximate height of each ayah container
             offset: 120 * index,
             index,
           })}
           removeClippedSubviews={false}
-          onScrollToIndexFailed={(info) => {
+          onScrollToIndexFailed={info => {
             // Fallback: scroll to offset if index scroll fails
             console.warn('ScrollToIndex failed, using offset fallback');
             flatListRef.current?.scrollToOffset({
@@ -169,9 +151,9 @@ export default function SurahScreen({ navigation, route }: Props) {
                   styles.ayahContainer,
                   index % 2 === 0 ? styles.ayahOdd : styles.ayahEven,
                   isHighlighted && {
-                    backgroundColor: '#dbeafe',
+                    backgroundColor: '#E8F5E9',
                     borderLeftWidth: 4,
-                    borderLeftColor: '#3b82f6',
+                    borderLeftColor: '#4CAF50',
                   },
                 ]}
               >
@@ -188,7 +170,7 @@ export default function SurahScreen({ navigation, route }: Props) {
                       isHighlighted && styles.ayahNumberTextHighlighted,
                     ]}
                   >
-                    {ayah.numberInSurah}
+                    {ayah.numberInSurah || ayah.ayahNumber}
                   </RNText>
                 </View>
 
@@ -204,7 +186,7 @@ export default function SurahScreen({ navigation, route }: Props) {
                     </Text>
                   )}
                   <Text variant="arabic" style={styles.ayahText}>
-                    {ayah.text}
+                    {ayah.arabicText || ayah.text}
                   </Text>
                 </View>
               </View>
@@ -258,14 +240,14 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
     paddingHorizontal: 16,
     marginBottom: 2,
-    backgroundColor: '#eff6ff', // Light blue background
+    backgroundColor: '#E8F5E9',
     borderBottomWidth: 1,
-    borderBottomColor: '#dbeafe',
+    borderBottomColor: '#C8E6C9',
   },
   bismillah: {
     fontSize: 26,
     lineHeight: 44,
-    color: '#1e40af',
+    color: '#1B5E20',
   },
   ayahContainer: {
     flexDirection: 'row',
@@ -284,19 +266,19 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#dbeafe',
+    backgroundColor: '#E8F5E9',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
     marginTop: 4,
   },
   ayahNumberHighlighted: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#4CAF50',
   },
   ayahNumberText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1e40af',
+    color: '#2E7D32',
   },
   ayahNumberTextHighlighted: {
     color: '#ffffff',

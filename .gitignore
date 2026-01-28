@@ -47,3 +47,4 @@ ENV/
 # Documentation (local only)
 docs/
 .expo
+*.md

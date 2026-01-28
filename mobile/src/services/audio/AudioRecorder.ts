@@ -77,36 +77,14 @@ export class AudioRecorder {
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+        staysActiveInBackground: true,
       });
 
       // Create recording with config
       const { recording } = await Audio.Recording.createAsync(
-        {
-          isMeteringEnabled: true,
-          android: {
-            extension: '.m4a',
-            outputFormat: Audio.AndroidOutputFormat.MPEG_4,
-            audioEncoder: Audio.AndroidAudioEncoder.AAC,
-            sampleRate: this.config.sampleRate,
-            numberOfChannels: this.config.numberOfChannels,
-            bitRate: 128000,
-          },
-          ios: {
-            extension: '.m4a',
-            outputFormat: Audio.IOSOutputFormat.MPEG4AAC,
-            audioQuality: Audio.IOSAudioQuality.HIGH,
-            sampleRate: this.config.sampleRate,
-            numberOfChannels: this.config.numberOfChannels,
-            bitRate: 128000,
-            linearPCMBitDepth: this.config.bitDepth,
-            linearPCMIsBigEndian: false,
-            linearPCMIsFloat: false,
-          },
-          web: {
-            mimeType: 'audio/wav',
-            bitsPerSecond: 128000,
-          },
-        },
+        Audio.RecordingOptionsPresets.HIGH_QUALITY,
         undefined, // onRecordingStatusUpdate callback
         100 // updateIntervalMillis
       );
@@ -302,7 +280,7 @@ export class AudioRecorder {
       console.log('📊 Recording status before stop:', {
         isRecording: status.isRecording,
         isDoneRecording: status.isDoneRecording,
-        duration: status.durationMillis
+        duration: status.durationMillis,
       });
 
       await this.recording.stopAndUnloadAsync();
@@ -374,8 +352,14 @@ export class AudioRecorder {
       }
 
       // Check if already stopped
-      if (!this.recording || this.status === 'stopped' || this.status === 'idle') {
-        console.log('✅ Recording already stopped (expected for single-chunk mode)');
+      if (
+        !this.recording ||
+        this.status === 'stopped' ||
+        this.status === 'idle'
+      ) {
+        console.log(
+          '✅ Recording already stopped (expected for single-chunk mode)'
+        );
         // Still clean up state
         this.recording = null;
         this.status = 'stopped';
@@ -385,12 +369,14 @@ export class AudioRecorder {
       }
 
       // Only reach here if manually stopped before chunk timer fired
-      console.log('⚠️ Manual stop before chunk timer - stopping active recording');
+      console.log(
+        '⚠️ Manual stop before chunk timer - stopping active recording'
+      );
 
       const status = await this.recording.getStatusAsync();
       console.log('📊 Recording status:', {
         isRecording: status.isRecording,
-        isDoneRecording: status.isDoneRecording
+        isDoneRecording: status.isDoneRecording,
       });
 
       // Check if recording is actually active before stopping
@@ -439,7 +425,9 @@ export class AudioRecorder {
     } catch (error: any) {
       // Only log error if it's NOT the "already unloaded" error
       if (error.message && error.message.includes('already been unloaded')) {
-        console.log('✅ Recording already unloaded (expected for single-chunk mode)');
+        console.log(
+          '✅ Recording already unloaded (expected for single-chunk mode)'
+        );
       } else {
         console.error('❌ Error stopping chunked recording:', error);
       }

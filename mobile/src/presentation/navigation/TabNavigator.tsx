@@ -6,6 +6,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { View, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import HomeScreen from '../screens/home/HomeScreen';
 import QuranListScreen from '../screens/quran/QuranListScreen';
 
@@ -16,13 +17,16 @@ export type TabParamList = {
 
 const Tab = createBottomTabNavigator<TabParamList>();
 
-// HeroUI-inspired colors
-const ACCENT_COLOR = '#3b82f6'; // Blue accent
+// Islamic-inspired colors
+const ACCENT_COLOR = '#4CAF50'; // Green accent
 const INACTIVE_COLOR = '#9ca3af'; // Gray
 const BG_COLOR = '#ffffff';
 const BORDER_COLOR = '#f3f4f6';
+const ACTIVE_BG_COLOR = '#E8F5E9'; // Light green background for active tab
 
 export default function TabNavigator() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -34,8 +38,8 @@ export default function TabNavigator() {
           borderTopColor: BORDER_COLOR,
           borderTopWidth: 1,
           paddingTop: 10,
-          paddingBottom: 10,
-          height: 65,
+          paddingBottom: insets.bottom > 0 ? insets.bottom : 10,
+          height: 65 + (insets.bottom > 0 ? insets.bottom - 10 : 0),
           elevation: 8,
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -2 },
@@ -48,15 +52,17 @@ export default function TabNavigator() {
           marginTop: 4,
           marginBottom: 2,
         },
-        tabBarIcon: ({ focused, color, size }) => {
+        tabBarIcon: ({ focused, color }) => {
           const iconSize = focused ? 26 : 24;
           const iconName = route.name === 'Finder' ? 'mic' : 'book';
 
           return (
-            <View style={[
-              styles.iconContainer,
-              focused && styles.iconContainerActive
-            ]}>
+            <View
+              style={[
+                styles.iconContainer,
+                focused && styles.iconContainerActive,
+              ]}
+            >
               <Ionicons name={iconName} size={iconSize} color={color} />
             </View>
           );
@@ -90,7 +96,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   iconContainerActive: {
-    backgroundColor: '#eff6ff', // Light blue background for active tab
+    backgroundColor: ACTIVE_BG_COLOR,
   },
 });
-
