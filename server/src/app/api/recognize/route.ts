@@ -153,11 +153,14 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Step 4: Increment usage
+    // Step 4: Increment usage and get updated stats
+    let updatedUsageStats;
     if (userId) {
       await usageService.incrementUserUsage(userId);
+      updatedUsageStats = await usageService.getUserUsageStats(userId);
     } else if (deviceId) {
       await usageService.incrementAnonymousUsage(deviceId);
+      updatedUsageStats = await usageService.getAnonymousUsageStats(deviceId);
     }
 
     // Step 5: Save to history
@@ -191,6 +194,7 @@ export async function POST(req: NextRequest) {
         surahTranslation: verse.surahTranslation,
         surahType: verse.surahType,
       },
+      usage: updatedUsageStats || null,
       processingTimeMs: Date.now() - startTime,
     });
   } catch (error) {

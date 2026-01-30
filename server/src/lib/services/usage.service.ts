@@ -48,14 +48,6 @@ class UsageService {
     limit: number;
     reason?: string;
   }> {
-    // TEMPORARY BYPASS FOR TESTING
-    return {
-      allowed: true,
-      remaining: 999,
-      limit: 999,
-    };
-
-    /*
     const dateString = this.getCurrentDateString();
 
     // Get user
@@ -133,7 +125,6 @@ class UsageService {
         limit,
       };
     }
-    */
   }
 
   /**
@@ -145,14 +136,6 @@ class UsageService {
     limit: number;
     reason?: string;
   }> {
-    // TEMPORARY BYPASS FOR TESTING
-    return {
-      allowed: true,
-      remaining: 999,
-      limit: 999,
-    };
-
-    /*
     const dateString = this.getCurrentDateString();
     const limit = USAGE_LIMITS.ANONYMOUS.DAILY_SEARCHES;
 
@@ -192,7 +175,6 @@ class UsageService {
       remaining,
       limit,
     };
-    */
   }
 
   /**
@@ -332,6 +314,7 @@ class UsageService {
     remaining: number;
     limit: number;
     resetAt: string;
+    subscriptionTier: "anonymous";
   }> {
     const dateString = this.getCurrentDateString();
     const limit = USAGE_LIMITS.ANONYMOUS.DAILY_SEARCHES;
@@ -352,6 +335,7 @@ class UsageService {
       remaining,
       limit,
       resetAt: this.getNextResetTime().toISOString(),
+      subscriptionTier: "anonymous",
     };
   }
 }
