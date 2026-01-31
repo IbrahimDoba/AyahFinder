@@ -2,8 +2,9 @@
  * Home Screen
  * Audio recognition with usage tracking
  */
-import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Alert, Pressable } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, StyleSheet, Alert, Pressable, AppState, AppStateStatus } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -45,12 +46,98 @@ export default function HomeScreen() {
     loadUsageStats();
   }, [user]);
 
+  // Refresh usage stats when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      loadUsageStats();
+    }, [])
+  );
+
+  // Refresh usage stats when app comes to foreground (e.g., after being in background)
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        console.log('[Usage] App came to foreground, refreshing stats');
+        loadUsageStats();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  // Set up midnight refresh timer
+  useEffect(() => {
+    const setupMidnightRefresh = () => {
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      
+      const msUntilMidnight = tomorrow.getTime() - now.getTime();
+      
+      console.log(`[Usage] Setting up midnight refresh in ${Math.round(msUntilMidnight / 1000 / 60)} minutes`);
+      
+      // Set timeout to refresh at midnight
+      const midnightTimeout = setTimeout(() => {
+        console.log('[Usage] Midnight reached, refreshing usage stats');
+        loadUsageStats();
+        // Set up the next day's refresh
+        setupMidnightRefresh();
+      }, msUntilMidnight);
+      
+      return midnightTimeout;
+    };
+
+    const timeout = setupMidnightRefresh();
+    
+    return () => {
+      clearTimeout(timeout);
+    };
+  }, []);
+
   const loadUsageStats = async () => {
     try {
+      console.log('[Usage] Fetching usage stats from server...');
       const stats = await serverUsageService.getUsageStats();
+      console.log('[Usage] Stats received:', stats);
       setUsageStats(stats);
     } catch (error) {
-      console.error('Error loading usage stats:', error);
+      console.error('[Usage] Error loading usage stats:', error);
+    }
+  };
+
+  // Format time until reset (e.g., "Resets in 5 hours" or "Resets in 15 days")
+  const getResetTimeText = (): string => {
+    if (!usageStats?.resetAt) return '';
+    
+    const now = new Date();
+    const resetTime = new Date(usageStats.resetAt);
+    const diffMs = resetTime.getTime() - now.getTime();
+    
+    if (diffMs <= 0) {
+      return 'Resets soon';
+    }
+    
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    
+    // For monthly resets (premium), show days
+    if (usageStats.period === 'monthly') {
+      const days = Math.floor(diffHours / 24);
+      const remainingHours = diffHours % 24;
+      if (days > 0) {
+        return `Resets in ${days} day${days > 1 ? 's' : ''}${remainingHours > 0 ? ` ${remainingHours}h` : ''}`;
+      }
+      return `Resets in ${diffHours}h ${diffMinutes}m`;
+    }
+    
+    // For daily resets (anonymous/free), show hours/minutes
+    if (diffHours > 0) {
+      return `Resets in ${diffHours}h ${diffMinutes}m`;
+    } else {
+      return `Resets in ${diffMinutes}m`;
     }
   };
 
@@ -196,16 +283,16 @@ export default function HomeScreen() {
         // Mark that match was found
         matchFoundRef.current = true;
 
-        // Increment usage counter AFTER successful recognition
-        try {
-          await serverUsageService.incrementUsage();
-          console.log('✅ Usage incremented');
-
-          // Reload usage stats to update UI
-          await loadUsageStats();
-        } catch (error) {
-          console.error('Error incrementing usage:', error);
-          // Don't block navigation on usage tracking error
+        // Usage is already incremented on the server, update UI with returned stats
+        if (result.usage) {
+          setUsageStats({
+            used: result.usage.used,
+            remaining: result.usage.remaining,
+            limit: result.usage.limit,
+            tier: (result.usage.subscriptionTier || 'anonymous') as any,
+            resetAt: result.usage.resetAt ? new Date(result.usage.resetAt) : new Date(),
+            period: result.usage.subscriptionTier === 'premium' ? 'monthly' : 'daily',
+          });
         }
 
         // Clear processing state
@@ -320,14 +407,18 @@ export default function HomeScreen() {
 
   const handleUpgrade = () => {
     setShowUpgradePrompt(false);
-    // TODO: Navigate to auth/subscription screen
-    // For now, just log
-    console.log('Upgrade button pressed');
-    Alert.alert(
-      'Coming Soon',
-      'Sign up and subscription features will be available soon!',
-      [{ text: 'OK' }]
-    );
+    
+    // Navigate based on user's current tier
+    if (usageStats?.tier === 'anonymous') {
+      // Anonymous user - redirect to signup for free account (5 searches/day)
+      navigation.navigate('SignUp');
+    } else if (usageStats?.tier === 'free') {
+      // Free user - navigate to Paywall to upgrade to premium
+      navigation.navigate('Paywall');
+    } else {
+      // Premium user - go to profile/account
+      navigation.navigate('Profile' as any);
+    }
   };
 
   return (
@@ -371,16 +462,28 @@ export default function HomeScreen() {
                     : COLORS.primary[500]
                 }
               />
-              <Text
-                variant="caption"
-                color={
-                  usageStats.remaining === 0
-                    ? COLORS.error[500]
-                    : COLORS.primary[500]
-                }
-              >
-                {`${usageStats.remaining}/${usageStats.limit} searches ${usageStats.period === 'daily' ? 'today' : 'this month'}`}
-              </Text>
+              <View style={styles.usageTextContainer}>
+                <Text
+                  variant="caption"
+                  color={
+                    usageStats.remaining === 0
+                      ? COLORS.error[500]
+                      : COLORS.primary[500]
+                  }
+                  style={styles.usageMainText}
+                >
+                  {`${usageStats.remaining}/${usageStats.limit} searches ${usageStats.period === 'daily' ? 'today' : 'this month'}`}
+                </Text>
+                {usageStats.remaining < usageStats.limit && (
+                  <Text
+                    variant="caption"
+                    color={COLORS.text.secondary}
+                    style={styles.usageResetText}
+                  >
+                    {getResetTimeText()}
+                  </Text>
+                )}
+              </View>
             </View>
           )}
         </View>
@@ -485,6 +588,16 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
+  },
+  usageTextContainer: {
+    alignItems: 'center',
+  },
+  usageMainText: {
+    fontWeight: '600',
+  },
+  usageResetText: {
+    fontSize: 10,
+    marginTop: 2,
   },
   buttonContainer: {
     flex: 1,

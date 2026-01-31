@@ -21,11 +21,20 @@ export interface VerseDetails {
   surahType?: string;
 }
 
+export interface UsageInfo {
+  used: number;
+  remaining: number;
+  limit: number;
+  resetAt?: string;
+  subscriptionTier?: string;
+}
+
 export interface RecognitionResult {
   success: boolean;
   transcription: string;
   match?: RecognitionMatch;
   verse?: VerseDetails;
+  usage?: UsageInfo | null;
   message?: string;
   processingTimeMs: number;
 }

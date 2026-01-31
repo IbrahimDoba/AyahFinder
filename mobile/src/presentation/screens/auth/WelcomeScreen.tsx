@@ -13,6 +13,9 @@ import { HeroButton } from '../../components/common/HeroButton';
 import { COLORS } from '../../../constants';
 import { RootStackParamList } from '../../navigation/RootNavigator';
 
+// Logo import
+const LOGO = require('../../../../assets/logo-transperant.png');
+
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function WelcomeScreen() {
@@ -24,10 +27,10 @@ export default function WelcomeScreen() {
         {/* Logo/Header Section */}
         <View style={styles.header}>
           <View style={styles.logoContainer}>
-            <Ionicons
-              name="musical-notes"
-              size={64}
-              color={COLORS.primary[500]}
+            <Image
+              source={LOGO}
+              style={styles.logo}
+              resizeMode="contain"
             />
           </View>
 
@@ -151,13 +154,18 @@ const styles = StyleSheet.create({
     marginTop: 32,
   },
   logoContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
     backgroundColor: COLORS.primary[50],
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 24,
+    padding: 16,
+  },
+  logo: {
+    width: '100%',
+    height: '100%',
   },
   title: {
     marginBottom: 12,

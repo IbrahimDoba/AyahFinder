@@ -6,7 +6,8 @@ export interface UsageStats {
   remaining: number;
   limit: number;
   resetAt: string;
-  subscriptionTier: "free" | "premium";
+  subscriptionTier: "anonymous" | "free" | "premium";
+  period: "daily" | "monthly";
 }
 
 class UsageService {
@@ -290,6 +291,7 @@ class UsageService {
         limit,
         resetAt: this.getMonthlyResetTime().toISOString(),
         subscriptionTier: "premium",
+        period: "monthly",
       };
     } else {
       const limit = USAGE_LIMITS.FREE.DAILY_SEARCHES;
@@ -302,6 +304,7 @@ class UsageService {
         limit,
         resetAt: this.getNextResetTime().toISOString(),
         subscriptionTier: "free",
+        period: "daily",
       };
     }
   }
@@ -315,6 +318,7 @@ class UsageService {
     limit: number;
     resetAt: string;
     subscriptionTier: "anonymous";
+    period: "daily";
   }> {
     const dateString = this.getCurrentDateString();
     const limit = USAGE_LIMITS.ANONYMOUS.DAILY_SEARCHES;
@@ -336,6 +340,7 @@ class UsageService {
       limit,
       resetAt: this.getNextResetTime().toISOString(),
       subscriptionTier: "anonymous",
+      period: "daily",
     };
   }
 }

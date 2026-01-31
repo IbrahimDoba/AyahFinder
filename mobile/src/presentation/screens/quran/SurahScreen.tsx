@@ -18,6 +18,7 @@ import { COLORS } from '@/constants';
 import { Ionicons } from '@expo/vector-icons';
 
 import serverQuranService from '@/services/quran/ServerQuranService';
+import { useSettingsStore } from '@/presentation/store/settingsStore';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Surah'>;
 
@@ -26,6 +27,9 @@ export default function SurahScreen({ navigation, route }: Props) {
     route.params;
   const [ayahs, setAyahs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Get settings
+  const { showTranslation } = useSettingsStore();
 
   // Refs for auto-scroll
   const flatListRef = useRef<FlatList>(null);
@@ -37,6 +41,8 @@ export default function SurahScreen({ navigation, route }: Props) {
   // Auto-scroll to highlighted ayah after loading
   useEffect(() => {
     let timer: NodeJS.Timeout;
+    let retryTimer: NodeJS.Timeout;
+    
     if (!loading && highlightAyah && ayahs.length > 0) {
       // Find the index of the ayah to scroll to
       const ayahIndex = ayahs.findIndex(
@@ -47,17 +53,29 @@ export default function SurahScreen({ navigation, route }: Props) {
         console.log(
           `📍 Scrolling to ayah ${highlightAyah} (index ${ayahIndex})`
         );
+        
+        // First attempt after layout is likely complete
         timer = setTimeout(() => {
           flatListRef.current?.scrollToIndex({
             index: ayahIndex,
             animated: true,
-            viewPosition: 0.2,
+            viewPosition: 0.25, // Position item 25% from top for better visibility
           });
-        }, 800);
+          
+          // Retry once more after animation to ensure correct position
+          retryTimer = setTimeout(() => {
+            flatListRef.current?.scrollToIndex({
+              index: ayahIndex,
+              animated: true,
+              viewPosition: 0.25,
+            });
+          }, 600);
+        }, 300);
       }
     }
     return () => {
       if (timer) clearTimeout(timer);
+      if (retryTimer) clearTimeout(retryTimer);
     };
   }, [loading, highlightAyah, ayahs]);
 
@@ -118,21 +136,31 @@ export default function SurahScreen({ navigation, route }: Props) {
           keyExtractor={item => item.number.toString()}
           style={styles.scrollView}
           contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-          getItemLayout={(_, index) => ({
-            length: 120, // Approximate height of each ayah container
-            offset: 120 * index,
-            index,
-          })}
-          removeClippedSubviews={false}
+          showsVerticalScrollIndicator={true}
+          // Note: We don't use getItemLayout because verses vary greatly in height
+          // FlatList will measure items automatically for accurate scrolling
           onScrollToIndexFailed={info => {
-            // Fallback: scroll to offset if index scroll fails
-            console.warn('ScrollToIndex failed, using offset fallback');
+            // Fallback: scroll to approximate offset based on average item length
+            console.warn('ScrollToIndex failed, using offset fallback:', info);
+            const fallbackOffset = info.averageItemLength * info.index;
             flatListRef.current?.scrollToOffset({
-              offset: info.averageItemLength * info.index,
+              offset: fallbackOffset,
               animated: true,
             });
+            // Try again after a delay once items are laid out
+            setTimeout(() => {
+              flatListRef.current?.scrollToIndex({
+                index: info.index,
+                animated: true,
+                viewPosition: 0.3,
+              });
+            }, 300);
           }}
+          // Performance optimizations to prevent glitchy scrolling
+          maxToRenderPerBatch={20}
+          windowSize={15}
+          updateCellsBatchingPeriod={50}
+          maintainVisibleContentPosition={undefined}
           ListHeaderComponent={
             surahNumber !== 9 && surahNumber !== 1 ? (
               <View style={styles.bismillahContainer}>
@@ -185,9 +213,22 @@ export default function SurahScreen({ navigation, route }: Props) {
                       🎯 Matched Verse
                     </Text>
                   )}
+                  
+                  {/* Arabic Text */}
                   <Text variant="arabic" style={styles.ayahText}>
                     {ayah.arabicText || ayah.text}
                   </Text>
+                  
+                  {/* English Translation (if enabled) */}
+                  {showTranslation && ayah.translation && (
+                    <Text
+                      variant="body"
+                      style={styles.translationText}
+                      color={COLORS.text.secondary}
+                    >
+                      {ayah.translation}
+                    </Text>
+                  )}
                 </View>
               </View>
             );
@@ -234,7 +275,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingBottom: 40,
+    paddingBottom: 200, // Extra padding to allow last items to scroll into full view
   },
   bismillahContainer: {
     paddingVertical: 24,
@@ -291,6 +332,15 @@ const styles = StyleSheet.create({
     lineHeight: 56,
     textAlign: 'right',
     color: '#111827',
+  },
+  translationText: {
+    fontSize: 15,
+    lineHeight: 24,
+    textAlign: 'left',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
   },
   matchLabel: {
     marginBottom: 8,

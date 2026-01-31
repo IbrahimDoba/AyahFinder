@@ -5,6 +5,7 @@
 import { create } from 'zustand';
 import authService, { User } from '../../services/auth/AuthService';
 import serverUsageService from '../../services/usage/ServerUsageService';
+import revenueCatService from '../../services/revenuecat/RevenueCatService';
 
 interface AuthState {
   // State
@@ -80,6 +81,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       const user = await authService.login({ email, password });
       get().setUser(user);
+
+      // Link RevenueCat to this user
+      await revenueCatService.logIn(user.id);
 
       console.log('✅ Sign in successful');
     } catch (error: any) {
@@ -207,6 +211,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ isLoading: true, error: null });
       console.log('👋 Signing out...');
 
+      // Log out from RevenueCat (reset to anonymous ID)
+      await revenueCatService.logOut();
+      
       await authService.logout();
       get().setUser(null);
 

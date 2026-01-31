@@ -8,13 +8,47 @@ import { Card } from 'heroui-native';
 import { COLORS } from '@/constants/colors';
 import { useNavigation } from '@react-navigation/native';
 import { useAuthStore } from '@/presentation/store/authStore';
+import { useSettingsStore } from '@/presentation/store/settingsStore';
 
 export default function ProfileScreen() {
   const navigation = useNavigation<any>();
   const { user, isLoading: storeLoading, signOut } = useAuthStore();
+  const { showTranslation, toggleTranslation } = useSettingsStore();
   const [localLoading, setLocalLoading] = useState(false);
 
   const isLoading = storeLoading || localLoading;
+  
+  // Render translation toggle row
+  const renderTranslationToggle = () => (
+    <View style={styles.toggleRow}>
+      <View style={styles.toggleIcon}>
+        <Ionicons
+          name="language-outline"
+          size={20}
+          color={COLORS.primary[500]}
+        />
+      </View>
+      <View style={styles.toggleTextContainer}>
+        <Text variant="body" style={styles.toggleLabel}>
+          Show Translation
+        </Text>
+        <Text variant="caption" color={COLORS.text.secondary}>
+          Display English translation below Arabic text
+        </Text>
+      </View>
+      <Pressable
+        style={[styles.toggleButton, showTranslation && styles.toggleButtonActive]}
+        onPress={toggleTranslation}
+      >
+        <View
+          style={[
+            styles.toggleKnob,
+            showTranslation && styles.toggleKnobActive,
+          ]}
+        />
+      </Pressable>
+    </View>
+  );
 
   const handleLogout = async () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
@@ -93,6 +127,14 @@ export default function ProfileScreen() {
               style={styles.guestButton}
             />
           </View>
+          
+          {/* Preferences Section */}
+          <Text variant="h3" style={[styles.sectionTitle, { marginTop: 40 }]}>
+            Preferences
+          </Text>
+          <Card style={styles.detailsCard}>
+            {renderTranslationToggle()}
+          </Card>
         </ScrollView>
       </SafeAreaView>
     );
@@ -148,7 +190,10 @@ export default function ProfileScreen() {
               </Text>
             </View>
             {user.subscriptionTier === 'free' && (
-              <Pressable style={styles.upgradeBadge}>
+              <Pressable 
+                style={styles.upgradeBadge}
+                onPress={() => navigation.navigate('Paywall')}
+              >
                 <Text style={styles.upgradeBadgeText}>Upgrade</Text>
               </Pressable>
             )}
@@ -173,6 +218,13 @@ export default function ProfileScreen() {
               </Text>
             </View>
           </View>
+        </Card>
+
+        <Text variant="h3" style={styles.sectionTitle}>
+          Preferences
+        </Text>
+        <Card style={styles.detailsCard}>
+          {renderTranslationToggle()}
         </Card>
 
         <Pressable style={styles.logoutButton} onPress={handleLogout}>
@@ -329,5 +381,49 @@ const styles = StyleSheet.create({
     color: '#F44336',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Toggle styles
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+  },
+  toggleIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f9fafb',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  toggleTextContainer: {
+    flex: 1,
+  },
+  toggleLabel: {
+    fontSize: 15,
+    color: '#111827',
+    marginBottom: 2,
+  },
+  toggleButton: {
+    width: 52,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#d1d5db',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  toggleButtonActive: {
+    backgroundColor: '#4CAF50',
+  },
+  toggleKnob: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    transform: [{ translateX: 0 }],
+  },
+  toggleKnobActive: {
+    transform: [{ translateX: 20 }],
   },
 });

@@ -19,6 +19,7 @@ import TabNavigator from './TabNavigator';
 import ResultScreen from '../screens/result/ResultScreen';
 import SurahScreen from '../screens/quran/SurahScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
+import PaywallScreen from '../screens/subscription/PaywallScreen';
 import { Text } from '../components/common/Text';
 
 export type RootStackParamList = {
@@ -38,6 +39,7 @@ export type RootStackParamList = {
     fromRecognition?: boolean;
   };
   Profile: undefined;
+  Paywall: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -61,6 +63,7 @@ function MainAppStack() {
       <Stack.Screen name="Profile" component={ProfileScreen} />
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="SignUp" component={SignUpScreen} />
+      <Stack.Screen name="Paywall" component={PaywallScreen} />
     </Stack.Navigator>
   );
 }
