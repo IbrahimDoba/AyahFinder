@@ -9,16 +9,16 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { HeroUINativeProvider } from 'heroui-native';
-import Purchases, { LOG_LEVEL } from 'react-native-purchases';
+// import Purchases, { LOG_LEVEL } from 'react-native-purchases';
 import RootNavigator from './src/presentation/navigation/RootNavigator';
 import { useAuthStore } from './src/presentation/store/authStore';
 import { useSettingsStore } from './src/presentation/store/settingsStore';
 
-// RevenueCat API Keys
-const REVENUECAT_API_KEYS = {
-  ios: 'test_BfoMezKesGhVUoiPplrxZewkGFi',
-  android: 'test_BfoMezKesGhVUoiPplrxZewkGFi',
-};
+// RevenueCat API Keys - TEMPORARILY DISABLED FOR TESTING
+// const REVENUECAT_API_KEYS = {
+//   ios: 'test_BfoMezKesGhVUoiPplrxZewkGFi',
+//   android: 'test_BfoMezKesGhVUoiPplrxZewkGFi',
+// };
 
 export default function App() {
   const initializeAuth = useAuthStore(state => state.initialize);
@@ -31,14 +31,14 @@ export default function App() {
         await initializeAuth();
         // Load user settings
         await loadSettings();
-        
-        // Initialize RevenueCat
-        Purchases.setLogLevel(LOG_LEVEL.VERBOSE);
-        const apiKey = Platform.OS === 'ios' 
-          ? REVENUECAT_API_KEYS.ios 
-          : REVENUECAT_API_KEYS.android;
-        Purchases.configure({ apiKey });
-        console.log('[RevenueCat] SDK initialized');
+
+        // Initialize RevenueCat - TEMPORARILY DISABLED FOR TESTING
+        // Purchases.setLogLevel(LOG_LEVEL.VERBOSE);
+        // const apiKey = Platform.OS === 'ios'
+        //   ? REVENUECAT_API_KEYS.ios
+        //   : REVENUECAT_API_KEYS.android;
+        // Purchases.configure({ apiKey });
+        // console.log('[RevenueCat] SDK initialized');
       } catch (error) {
         console.error('Failed to initialize app:', error);
         // App can still run without authentication/settings
