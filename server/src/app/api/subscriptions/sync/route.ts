@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { auth } from '@/lib/middleware/auth.middleware';
+import { authenticateRequest } from '@/lib/middleware/auth.middleware';
 import { db } from '@/lib/db/client';
 import { successResponse, handleError } from '@/lib/utils/errors';
 
@@ -10,7 +10,7 @@ import { successResponse, handleError } from '@/lib/utils/errors';
 export async function POST(req: NextRequest) {
   try {
     // Authenticate user
-    const user = await auth(req);
+    const user = await authenticateRequest(req);
     
     if (!user) {
       return handleError(new Error('Unauthorized'));
