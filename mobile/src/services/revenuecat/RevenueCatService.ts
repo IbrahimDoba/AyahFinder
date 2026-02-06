@@ -14,7 +14,8 @@ import { apiClient } from '../api/client';
 const ENTITLEMENT_PREMIUM = 'premium';
 
 // TEST MODE: Set to true for testing without Google Play
-export const TEST_MODE = true;
+// Set to false when ready for Google Play sandbox testing
+export const TEST_MODE = false; // PRODUCTION: Using real Google Play
 
 export interface SubscriptionInfo {
   isActive: boolean;
@@ -313,26 +314,47 @@ class RevenueCatService {
   }
 
   /**
+   * Manually sync purchase with backend (public method)
+   * Call this after a purchase to ensure backend is updated
+   */
+  async syncPurchase(customerInfo: CustomerInfo): Promise<void> {
+    return this.syncPurchaseWithServer(customerInfo);
+  }
+
+  /**
    * Sync purchase with server
    * Sends RevenueCat user ID to server for webhook validation
    */
   private async syncPurchaseWithServer(customerInfo: CustomerInfo): Promise<void> {
+    // TEST MODE: Skip server sync in test mode
+    if (TEST_MODE) {
+      console.log('[RevenueCat] TEST MODE: Skipping server sync');
+      return;
+    }
+
     try {
       const isPremium = this.checkPremiumEntitlement(customerInfo);
-      
+
       if (!isPremium) {
         console.log('[RevenueCat] Not premium, skipping sync');
         return;
       }
 
+      // Check if SDK is configured before getting app user ID
+      const isConfigured = await Purchases.isConfigured();
+      if (!isConfigured) {
+        console.warn('[RevenueCat] SDK not configured, skipping server sync');
+        return;
+      }
+
       const appUserId = await Purchases.getAppUserID();
-      
+
       console.log('[RevenueCat] Syncing purchase with server...');
-      
+
       await apiClient.post('/subscriptions/sync', {
         revenueCatCustomerId: appUserId,
       });
-      
+
       console.log('[RevenueCat] Server sync successful');
     } catch (error) {
       console.error('[RevenueCat] Server sync error:', error);
@@ -344,7 +366,20 @@ class RevenueCatService {
    * Log out user from RevenueCat (call on sign out)
    */
   async logOut(): Promise<void> {
+    // TEST MODE: No SDK operations needed
+    if (TEST_MODE) {
+      console.log('[RevenueCat] TEST MODE: Logout (no-op)');
+      return;
+    }
+
     try {
+      // Check if SDK is configured
+      const isConfigured = await Purchases.isConfigured();
+      if (!isConfigured) {
+        console.warn('[RevenueCat] SDK not configured, skipping logout');
+        return;
+      }
+
       console.log('[RevenueCat] Logging out...');
       await Purchases.logOut();
       console.log('[RevenueCat] Logout successful');
@@ -358,7 +393,20 @@ class RevenueCatService {
    * This links purchases to the user's account
    */
   async logIn(userId: string): Promise<CustomerInfo | null> {
+    // TEST MODE: No SDK operations needed
+    if (TEST_MODE) {
+      console.log('[RevenueCat] TEST MODE: Login user:', userId, '(no-op)');
+      return null;
+    }
+
     try {
+      // Check if SDK is configured
+      const isConfigured = await Purchases.isConfigured();
+      if (!isConfigured) {
+        console.warn('[RevenueCat] SDK not configured yet, skipping login. Will retry on next app start.');
+        return null;
+      }
+
       console.log('[RevenueCat] Logging in user:', userId);
       const { customerInfo } = await Purchases.logIn(userId);
       console.log('[RevenueCat] Login successful');

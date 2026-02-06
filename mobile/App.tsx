@@ -9,16 +9,17 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { HeroUINativeProvider } from 'heroui-native';
-// import Purchases, { LOG_LEVEL } from 'react-native-purchases';
+import Purchases, { LOG_LEVEL } from 'react-native-purchases';
 import RootNavigator from './src/presentation/navigation/RootNavigator';
 import { useAuthStore } from './src/presentation/store/authStore';
 import { useSettingsStore } from './src/presentation/store/settingsStore';
+import { REVENUECAT_ANDROID_API_KEY, REVENUECAT_IOS_API_KEY } from '@env';
 
-// RevenueCat API Keys - TEMPORARILY DISABLED FOR TESTING
-// const REVENUECAT_API_KEYS = {
-//   ios: 'test_BfoMezKesGhVUoiPplrxZewkGFi',
-//   android: 'test_BfoMezKesGhVUoiPplrxZewkGFi',
-// };
+// RevenueCat API Keys
+const REVENUECAT_API_KEYS = {
+  ios: REVENUECAT_IOS_API_KEY,
+  android: REVENUECAT_ANDROID_API_KEY,
+};
 
 export default function App() {
   const initializeAuth = useAuthStore(state => state.initialize);
@@ -32,13 +33,19 @@ export default function App() {
         // Load user settings
         await loadSettings();
 
-        // Initialize RevenueCat - TEMPORARILY DISABLED FOR TESTING
-        // Purchases.setLogLevel(LOG_LEVEL.VERBOSE);
-        // const apiKey = Platform.OS === 'ios'
-        //   ? REVENUECAT_API_KEYS.ios
-        //   : REVENUECAT_API_KEYS.android;
-        // Purchases.configure({ apiKey });
-        // console.log('[RevenueCat] SDK initialized');
+        // Initialize RevenueCat
+        const apiKey = Platform.OS === 'ios'
+          ? REVENUECAT_API_KEYS.ios
+          : REVENUECAT_API_KEYS.android;
+
+        if (!apiKey) {
+          console.error('[RevenueCat] API key not configured. In-app purchases will not work.');
+          console.error('[RevenueCat] Please set REVENUECAT_ANDROID_API_KEY and REVENUECAT_IOS_API_KEY in EAS environment.');
+        } else {
+          Purchases.setLogLevel(LOG_LEVEL.VERBOSE);
+          Purchases.configure({ apiKey });
+          console.log('[RevenueCat] SDK initialized with key:', apiKey.substring(0, 10) + '...');
+        }
       } catch (error) {
         console.error('Failed to initialize app:', error);
         // App can still run without authentication/settings

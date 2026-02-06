@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Pressable, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '@/presentation/components/common/Text';
@@ -9,12 +9,14 @@ import { COLORS } from '@/constants/colors';
 import { useNavigation } from '@react-navigation/native';
 import { useAuthStore } from '@/presentation/store/authStore';
 import { useSettingsStore } from '@/presentation/store/settingsStore';
+import { useCustomAlert } from '@/presentation/hooks/useCustomAlert';
 
 export default function ProfileScreen() {
   const navigation = useNavigation<any>();
   const { user, isLoading: storeLoading, signOut } = useAuthStore();
   const { showTranslation, toggleTranslation } = useSettingsStore();
   const [localLoading, setLocalLoading] = useState(false);
+  const { showAlert, AlertComponent } = useCustomAlert();
 
   const isLoading = storeLoading || localLoading;
   
@@ -51,25 +53,30 @@ export default function ProfileScreen() {
   );
 
   const handleLogout = async () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Logout',
-        style: 'destructive',
-        onPress: async () => {
-          setLocalLoading(true);
-          try {
-            await signOut();
-            // RootNavigator will handle stack change, navigating to Welcome
-            navigation.navigate('Welcome' as any);
-          } catch (error) {
-            console.error('Logout error:', error);
-          } finally {
-            setLocalLoading(false);
-          }
+    showAlert({
+      title: 'Logout',
+      message: 'Are you sure you want to logout?',
+      type: 'warning',
+      buttons: [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            setLocalLoading(true);
+            try {
+              await signOut();
+              // RootNavigator will handle stack change, navigating to Welcome
+              navigation.navigate('Welcome' as any);
+            } catch (error) {
+              console.error('Logout error:', error);
+            } finally {
+              setLocalLoading(false);
+            }
+          },
         },
-      },
-    ]);
+      ],
+    });
   };
 
   if (isLoading) {
@@ -232,6 +239,9 @@ export default function ProfileScreen() {
           <Text style={styles.logoutText}>Logout</Text>
         </Pressable>
       </ScrollView>
+
+      {/* Custom Alert */}
+      <AlertComponent />
     </SafeAreaView>
   );
 }

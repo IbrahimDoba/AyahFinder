@@ -3,7 +3,7 @@
  * Audio recognition with usage tracking
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, StyleSheet, Alert, Pressable, AppState, AppStateStatus } from 'react-native';
+import { View, StyleSheet, Pressable, AppState, AppStateStatus } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -21,6 +21,7 @@ import { AudioRecorder } from '@/services/audio/AudioRecorder';
 import { useRealTimeRecognition } from '@/presentation/hooks/useRealTimeRecognition';
 import serverUsageService from '@/services/usage/ServerUsageService';
 import { UpgradePrompt } from '@/presentation/components/usage/UpgradePrompt';
+import { useCustomAlert } from '@/presentation/hooks/useCustomAlert';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -30,6 +31,7 @@ export default function HomeScreen() {
   const { isRecording, setRecording, isProcessing, setProcessing } =
     useRecognitionStore();
   const { user } = useAuthStore();
+  const { showAlert, AlertComponent } = useCustomAlert();
 
   // Refs to prevent multiple stop calls and track match state
   const isStoppingRef = useRef(false);
@@ -206,9 +208,12 @@ export default function HomeScreen() {
       // Request permissions
       const hasPermission = await audioRecorder.requestPermissions();
       if (!hasPermission) {
-        Alert.alert('Microphone Permission', ERROR_MESSAGES.MICROPHONE_DENIED, [
-          { text: 'OK' },
-        ]);
+        showAlert({
+          title: 'Microphone Permission',
+          message: ERROR_MESSAGES.MICROPHONE_DENIED,
+          type: 'warning',
+          buttons: [{ text: 'OK' }],
+        });
         return;
       }
 
@@ -247,11 +252,12 @@ export default function HomeScreen() {
                 console.log('⏱️ No match found after processing');
                 setProcessing(false);
                 setShowRetry(true);
-                Alert.alert(
-                  'No Match Found',
-                  'Could not identify the recitation. Please try again with a clearer audio.',
-                  [{ text: 'OK' }]
-                );
+                showAlert({
+                  title: 'No Match Found',
+                  message: 'Could not identify the recitation. Please try again with a clearer audio.',
+                  type: 'info',
+                  buttons: [{ text: 'OK' }],
+                });
               }
             }, 2000);
           } catch (error) {
@@ -259,11 +265,12 @@ export default function HomeScreen() {
             stopMatching(); // Stop matching on error too
             setProcessing(false);
             setShowRetry(true);
-            Alert.alert(
-              'Processing Failed',
-              'Failed to process audio. Please try again.',
-              [{ text: 'OK' }]
-            );
+            showAlert({
+              title: 'Processing Failed',
+              message: 'Failed to process audio. Please try again.',
+              type: 'error',
+              buttons: [{ text: 'OK' }],
+            });
           }
         }
       );
@@ -320,7 +327,11 @@ export default function HomeScreen() {
       console.error('Start recording error:', error);
       setProcessing(false);
       setShowRetry(true);
-      Alert.alert('Error', 'Failed to start recording');
+      showAlert({
+        title: 'Error',
+        message: 'Failed to start recording',
+        type: 'error',
+      });
     }
   };
 
@@ -369,11 +380,12 @@ export default function HomeScreen() {
               console.log('⏱️ No match found after manual stop');
               setProcessing(false);
               setShowRetry(true);
-              Alert.alert(
-                'No Match Found',
-                'Could not identify the recitation. Please try again with a clearer audio.',
-                [{ text: 'OK' }]
-              );
+              showAlert({
+                title: 'No Match Found',
+                message: 'Could not identify the recitation. Please try again with a clearer audio.',
+                type: 'info',
+                buttons: [{ text: 'OK' }],
+              });
             }
           }, 2000);
         } catch (error) {
@@ -472,7 +484,7 @@ export default function HomeScreen() {
                   }
                   style={styles.usageMainText}
                 >
-                  {`${usageStats.remaining}/${usageStats.limit} searches ${usageStats.period === 'daily' ? 'today' : 'this month'}`}
+                  {`${usageStats.remaining}/${usageStats.limit} searches ${usageStats.tier === 'premium' ? 'this month' : 'today'}`}
                 </Text>
                 {usageStats.remaining < usageStats.limit && (
                   <Text
@@ -546,6 +558,9 @@ export default function HomeScreen() {
           onDismiss={() => setShowUpgradePrompt(false)}
         />
       )}
+
+      {/* Custom Alert */}
+      <AlertComponent />
     </SafeAreaView>
   );
 }

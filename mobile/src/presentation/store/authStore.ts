@@ -5,7 +5,7 @@
 import { create } from 'zustand';
 import authService, { User } from '../../services/auth/AuthService';
 import serverUsageService from '../../services/usage/ServerUsageService';
-// import revenueCatService from '../../services/revenuecat/RevenueCatService'; // TEMPORARILY DISABLED FOR TESTING
+import revenueCatService from '../../services/revenuecat/RevenueCatService';
 
 interface AuthState {
   // State
@@ -63,6 +63,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const currentUser = await authService.initialize();
       get().setUser(currentUser);
 
+      // If user is logged in, link RevenueCat to their user ID
+      // Note: This may fail if RevenueCat SDK isn't initialized yet, which is fine
+      if (currentUser) {
+        try {
+          const customerInfo = await revenueCatService.logIn(currentUser.id);
+          if (customerInfo) {
+            console.log('[RevenueCat] User linked on initialization:', currentUser.id);
+          }
+        } catch (rcError) {
+          console.error('[RevenueCat] Failed to link user on initialization:', rcError);
+          // Don't fail initialization if RevenueCat fails
+          // User will be linked on next app restart when SDK is ready
+        }
+      }
+
       set({ isInitialized: true });
       console.log('✅ Auth store initialized', currentUser ? `User: ${currentUser.email}` : 'No user');
     } catch (error: any) {
@@ -82,8 +97,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const user = await authService.login({ email, password });
       get().setUser(user);
 
-      // Link RevenueCat to this user - TEMPORARILY DISABLED FOR TESTING
-      // await revenueCatService.logIn(user.id);
+      // Link RevenueCat to this user
+      // Note: In TEST_MODE, this is a no-op. In production, links purchases to user ID.
+      try {
+        const customerInfo = await revenueCatService.logIn(user.id);
+        if (customerInfo) {
+          console.log('[RevenueCat] User linked with customer info');
+        }
+      } catch (rcError) {
+        console.error('[RevenueCat] Failed to link user:', rcError);
+        // Don't fail login if RevenueCat fails
+      }
 
       console.log('✅ Sign in successful');
     } catch (error: any) {
@@ -211,8 +235,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ isLoading: true, error: null });
       console.log('👋 Signing out...');
 
-      // Log out from RevenueCat (reset to anonymous ID) - TEMPORARILY DISABLED FOR TESTING
-      // await revenueCatService.logOut();
+      // Log out from RevenueCat (reset to anonymous ID)
+      try {
+        await revenueCatService.logOut();
+        console.log('[RevenueCat] User logged out');
+      } catch (rcError) {
+        console.error('[RevenueCat] Failed to log out:', rcError);
+        // Don't fail logout if RevenueCat fails
+      }
 
       await authService.logout();
       get().setUser(null);

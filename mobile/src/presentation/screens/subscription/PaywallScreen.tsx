@@ -1,278 +1,167 @@
 /**
  * Paywall Screen
- * Subscription purchase screen using RevenueCat
+ * Uses RevenueCat's remote paywall component from dashboard
  */
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Ionicons } from '@expo/vector-icons';
-import { PurchasesOffering, PurchasesPackage } from 'react-native-purchases';
-import { Text } from '../../components/common/Text';
-import { HeroButton } from '../../components/common/HeroButton';
+import RevenueCatUI from 'react-native-purchases-ui';
+import { CustomerInfo } from 'react-native-purchases';
 import { COLORS } from '../../../constants';
 import { RootStackParamList } from '../../navigation/RootNavigator';
-import revenueCatService, { TEST_MODE } from '../../../services/revenuecat/RevenueCatService';
+import { Text } from '../../components/common/Text';
+import SubscriptionModal from '../../components/subscription/SubscriptionModal';
+import revenueCatService from '../../../services/revenuecat/RevenueCatService';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
+type ModalState = {
+  visible: boolean;
+  type: 'success' | 'error' | 'restore';
+  title: string;
+  message: string;
+};
+
 export default function PaywallScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const [offering, setOffering] = useState<PurchasesOffering | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [purchasing, setPurchasing] = useState(false);
-  const [restoring, setRestoring] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [modal, setModal] = useState<ModalState>({
+    visible: false,
+    type: 'success',
+    title: '',
+    message: '',
+  });
 
-  useEffect(() => {
-    loadOfferings();
-  }, []);
-
-  const loadOfferings = async () => {
-    try {
-      setLoading(true);
-      const currentOffering = await revenueCatService.getOfferings();
-      setOffering(currentOffering);
-    } catch (error) {
-      console.error('Error loading offerings:', error);
-    } finally {
-      setLoading(false);
-    }
+  const handleDismiss = () => {
+    console.log('[RevenueCat UI] Paywall dismissed');
+    navigation.goBack();
   };
 
-  const handlePurchase = async (pkg: PurchasesPackage) => {
+  const handlePurchaseCompleted = async ({ customerInfo }: { customerInfo: CustomerInfo }) => {
+    console.log('[RevenueCat UI] Purchase completed!', customerInfo);
+
+    // Show syncing state
+    setIsSyncing(true);
+
     try {
-      setPurchasing(true);
-      const result = await revenueCatService.purchasePackage(pkg);
+      // Check if user has premium
+      const isPremium = revenueCatService.checkPremiumEntitlement(customerInfo);
+      console.log('[Paywall] Premium status:', isPremium);
 
-      if (result.success) {
-        Alert.alert(
-          'Subscription Activated!',
-          'You now have access to 100 audio searches per month.',
-          [
-            {
-              text: 'OK',
-              onPress: () => navigation.goBack(),
-            },
-          ]
-        );
-      } else if (result.error) {
-        Alert.alert('Purchase Failed', result.error);
-      }
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Purchase failed. Please try again.');
-    } finally {
-      setPurchasing(false);
-    }
-  };
+      if (isPremium) {
+        // Sync with backend - this updates the user's subscription tier
+        console.log('[Paywall] Syncing purchase with backend...');
+        await revenueCatService.syncPurchase(customerInfo);
+        console.log('[Paywall] ✅ Backend sync successful');
 
-  const handleRestore = async () => {
-    try {
-      setRestoring(true);
-      const result = await revenueCatService.restorePurchases();
+        // Small delay to ensure everything is propagated
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
-      if (result.isPremium) {
-        Alert.alert(
-          'Purchases Restored',
-          'Your subscription has been restored successfully.',
-          [
-            {
-              text: 'OK',
-              onPress: () => navigation.goBack(),
-            },
-          ]
-        );
+        // Show success modal
+        setModal({
+          visible: true,
+          type: 'success',
+          title: '🎉 Welcome to Premium!',
+          message: 'Your account has been upgraded. Enjoy unlimited searches and premium features!',
+        });
       } else {
-        Alert.alert(
-          'No Purchases Found',
-          'We could not find any previous purchases to restore.'
-        );
+        // Purchase completed but no premium entitlement
+        console.warn('[Paywall] Purchase completed but no premium entitlement found');
+        navigation.goBack();
       }
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to restore purchases.');
+    } catch (error) {
+      console.error('[Paywall] Error syncing purchase:', error);
+      // Still show success - user has premium in RevenueCat, backend will sync via webhook
+      setModal({
+        visible: true,
+        type: 'success',
+        title: 'Purchase Successful',
+        message: 'Your purchase is being processed. It may take a few moments to activate. Please restart the app if needed.',
+      });
     } finally {
-      setRestoring(false);
+      setIsSyncing(false);
     }
   };
 
-  const formatPrice = (pkg: PurchasesPackage): string => {
-    return pkg.product.priceString;
+  const handleRestoreCompleted = async ({ customerInfo }: { customerInfo: CustomerInfo }) => {
+    console.log('[RevenueCat UI] Restore completed!', customerInfo);
+
+    setIsSyncing(true);
+
+    try {
+      const isPremium = revenueCatService.checkPremiumEntitlement(customerInfo);
+
+      if (isPremium) {
+        console.log('[Paywall] Syncing restored purchase with backend...');
+        await revenueCatService.syncPurchase(customerInfo);
+
+        setModal({
+          visible: true,
+          type: 'restore',
+          title: 'Purchases Restored',
+          message: 'Your premium subscription has been restored successfully!',
+        });
+      } else {
+        setModal({
+          visible: true,
+          type: 'error',
+          title: 'No Purchases Found',
+          message: 'No active subscriptions were found to restore. If you recently purchased, please wait a few minutes and try again.',
+        });
+      }
+    } catch (error) {
+      console.error('[Paywall] Error restoring:', error);
+      setModal({
+        visible: true,
+        type: 'error',
+        title: 'Restore Failed',
+        message: 'An error occurred while restoring purchases. Please try again later.',
+      });
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary[500]} />
-          <Text style={styles.loadingText}>Loading subscription options...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  const handlePurchaseError = (error: any) => {
+    console.error('[RevenueCat UI] Purchase error:', error);
+  };
 
-  const monthlyPackage = offering 
-    ? revenueCatService.getMonthlyPackage(offering) 
-    : null;
+  const handleModalClose = () => {
+    setModal({ ...modal, visible: false });
+    navigation.goBack();
+  };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
-          <Ionicons name="close" size={28} color={COLORS.text.primary} />
-        </TouchableOpacity>
-        <Text variant="h2" style={styles.headerTitle}>
-          Upgrade to Premium
-        </Text>
-        <View style={{ width: 40 }} />
+    <SafeAreaView style={styles.container}>
+      <View style={styles.paywallContainer}>
+        <RevenueCatUI.Paywall
+          onDismiss={handleDismiss}
+          onPurchaseCompleted={handlePurchaseCompleted}
+          onRestoreCompleted={handleRestoreCompleted}
+          onPurchaseError={handlePurchaseError}
+        />
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Test Mode Banner */}
-        {TEST_MODE && (
-          <View style={styles.testModeBanner}>
-            <Ionicons name="bug" size={16} color="#fff" />
-            <Text style={styles.testModeText}>
-              TEST MODE - No real charges
-            </Text>
-          </View>
-        )}
-
-        {/* Hero Section */}
-        <View style={styles.heroSection}>
-          <View style={styles.iconContainer}>
-            <Ionicons name="crown" size={64} color={COLORS.secondary[500]} />
-          </View>
-          <Text variant="h1" align="center" style={styles.title}>
-            Go Premium
-          </Text>
-          <Text
-            variant="body"
-            align="center"
-            color={COLORS.text.secondary}
-            style={styles.subtitle}
-          >
-            Unlock unlimited Quran identification with 100 searches per month
-          </Text>
-        </View>
-
-        {/* Benefits */}
-        <View style={styles.benefitsContainer}>
-          <Text variant="h3" style={styles.benefitsTitle}>
-            Premium Benefits
-          </Text>
-
-          <View style={styles.benefitItem}>
-            <Ionicons name="infinite" size={24} color={COLORS.primary[500]} />
-            <View style={styles.benefitText}>
-              <Text variant="body" style={styles.benefitTitle}>
-                100 Searches Per Month
-              </Text>
-              <Text variant="caption" color={COLORS.text.secondary}>
-                20x more than the free plan
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.benefitItem}>
-            <Ionicons name="flash" size={24} color={COLORS.primary[500]} />
-            <View style={styles.benefitText}>
-              <Text variant="body" style={styles.benefitTitle}>
-                Priority Recognition
-              </Text>
-              <Text variant="caption" color={COLORS.text.secondary}>
-                Faster processing for premium users
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.benefitItem}>
-            <Ionicons name="time" size={24} color={COLORS.primary[500]} />
-            <View style={styles.benefitText}>
-              <Text variant="body" style={styles.benefitTitle}>
-                Longer Audio Support
-              </Text>
-              <Text variant="caption" color={COLORS.text.secondary}>
-                Identify longer recitations
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.benefitItem}>
-            <Ionicons name="cloud-upload" size={24} color={COLORS.primary[500]} />
-            <View style={styles.benefitText}>
-              <Text variant="body" style={styles.benefitTitle}>
-                Search History
-              </Text>
-              <Text variant="caption" color={COLORS.text.secondary}>
-                Save and revisit your past searches
-              </Text>
-            </View>
+      {/* Loading overlay during backend sync */}
+      {isSyncing && (
+        <View style={styles.syncingOverlay}>
+          <View style={styles.syncingContainer}>
+            <ActivityIndicator size="large" color={COLORS.primary.main} />
+            <Text style={styles.syncingText}>Activating premium...</Text>
           </View>
         </View>
+      )}
 
-        {/* Pricing */}
-        {monthlyPackage ? (
-          <View style={styles.pricingContainer}>
-            <View style={styles.priceCard}>
-              <Text variant="h2" style={styles.priceText}>
-                {formatPrice(monthlyPackage)}
-              </Text>
-              <Text variant="caption" color={COLORS.text.secondary}>
-                per month
-              </Text>
-            </View>
-
-            <HeroButton
-              title={purchasing ? 'Processing...' : 'Subscribe Now'}
-              variant="primary"
-              onPress={() => handlePurchase(monthlyPackage)}
-              disabled={purchasing}
-              style={styles.subscribeButton}
-            />
-          </View>
-        ) : (
-          <View style={styles.noOfferingContainer}>
-            <Text variant="body" color={COLORS.text.secondary}>
-              Subscription options are currently unavailable.
-            </Text>
-            <Text variant="caption" color={COLORS.text.secondary}>
-              Please try again later.
-            </Text>
-          </View>
-        )}
-
-        {/* Restore Purchases */}
-        <TouchableOpacity
-          style={styles.restoreButton}
-          onPress={handleRestore}
-          disabled={restoring}
-        >
-          <Text variant="body" color={COLORS.primary[500]}>
-            {restoring ? 'Restoring...' : 'Restore Purchases'}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Terms */}
-        <Text variant="caption" align="center" color={COLORS.text.secondary} style={styles.terms}>
-          {TEST_MODE 
-            ? 'TEST MODE: This is a simulated purchase. No real money will be charged.'
-            : 'Subscription automatically renews monthly. Cancel anytime in Google Play Store.'}
-        </Text>
-      </ScrollView>
+      {/* Custom subscription modal */}
+      <SubscriptionModal
+        visible={modal.visible}
+        type={modal.type}
+        title={modal.title}
+        message={modal.message}
+        onClose={handleModalClose}
+      />
     </SafeAreaView>
   );
 }
@@ -282,121 +171,28 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background.default,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    color: COLORS.text.secondary,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    color: COLORS.primary[900],
-  },
-  scrollContent: {
-    padding: 24,
-    paddingBottom: 40,
-  },
-  heroSection: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  iconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: COLORS.secondary[100],
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  title: {
-    marginBottom: 8,
-    color: COLORS.primary[900],
-  },
-  subtitle: {
-    paddingHorizontal: 20,
-    lineHeight: 22,
-  },
-  benefitsContainer: {
-    backgroundColor: '#f9fafb',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-  },
-  benefitsTitle: {
-    marginBottom: 20,
-    color: COLORS.primary[900],
-  },
-  benefitItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-    gap: 12,
-  },
-  benefitText: {
+  paywallContainer: {
     flex: 1,
   },
-  benefitTitle: {
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  pricingContainer: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  priceCard: {
-    backgroundColor: COLORS.primary[50],
-    borderRadius: 16,
-    padding: 24,
-    alignItems: 'center',
-    marginBottom: 16,
-    width: '100%',
-  },
-  priceText: {
-    color: COLORS.primary[700],
-    fontSize: 36,
-  },
-  subscribeButton: {
-    width: '100%',
-  },
-  noOfferingContainer: {
-    alignItems: 'center',
-    padding: 24,
-  },
-  restoreButton: {
-    alignItems: 'center',
-    paddingVertical: 16,
-  },
-  terms: {
-    marginTop: 16,
-    paddingHorizontal: 20,
-  },
-  testModeBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  syncingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
-    backgroundColor: '#FF6B35',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginBottom: 16,
-    gap: 8,
+    alignItems: 'center',
   },
-  testModeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
+  syncingContainer: {
+    backgroundColor: COLORS.background.default,
+    padding: 24,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  syncingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: COLORS.text.primary,
   },
 });
