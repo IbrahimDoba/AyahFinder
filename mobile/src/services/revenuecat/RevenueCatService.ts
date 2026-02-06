@@ -416,6 +416,33 @@ class RevenueCatService {
       return null;
     }
   }
+
+  /**
+   * Get subscription management URL
+   * Opens the platform-specific page (Google Play or App Store) to manage subscription
+   */
+  async getManagementURL(): Promise<string | null> {
+    // TEST MODE: Return mock URL
+    if (TEST_MODE) {
+      console.log('[RevenueCat] TEST MODE: Returning mock management URL');
+      return 'https://play.google.com/store/account/subscriptions';
+    }
+
+    try {
+      const customerInfo = await this.getCustomerInfo();
+
+      if (!customerInfo?.managementURL) {
+        console.warn('[RevenueCat] No management URL available');
+        return null;
+      }
+
+      console.log('[RevenueCat] Management URL:', customerInfo.managementURL);
+      return customerInfo.managementURL;
+    } catch (error) {
+      console.error('[RevenueCat] Error getting management URL:', error);
+      return null;
+    }
+  }
 }
 
 // Singleton instance

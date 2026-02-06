@@ -1,7 +1,8 @@
 /**
  * Typography Configuration
- * Optimized for Arabic text readability
+ * Optimized for Arabic text readability and responsive across devices
  */
+import { normalize } from '@/utils/responsive';
 
 export const TYPOGRAPHY = {
   // Font families
@@ -17,26 +18,26 @@ export const TYPOGRAPHY = {
     },
   },
 
-  // Font sizes
+  // Font sizes - responsive across different screen sizes
   sizes: {
-    xs: 12,
-    sm: 14,
-    md: 16,
-    lg: 18,
-    xl: 20,
-    '2xl': 24,
-    '3xl': 28,
-    '4xl': 32,
-    '5xl': 36,
+    xs: normalize(12, 0.3),
+    sm: normalize(14, 0.3),
+    md: normalize(16, 0.3),
+    lg: normalize(18, 0.3),
+    xl: normalize(20, 0.4),
+    '2xl': normalize(24, 0.4),
+    '3xl': normalize(28, 0.5),
+    '4xl': normalize(32, 0.5),
+    '5xl': normalize(36, 0.5),
   },
 
-  // Arabic-specific sizes (larger for readability)
+  // Arabic-specific sizes (larger for readability) - responsive
   arabicSizes: {
-    sm: 18,
-    md: 22,
-    lg: 26,
-    xl: 30,
-    '2xl': 34,
+    sm: normalize(18, 0.3),
+    md: normalize(22, 0.4),
+    lg: normalize(26, 0.4),
+    xl: normalize(30, 0.5),
+    '2xl': normalize(34, 0.5),
   },
 
   // Line heights

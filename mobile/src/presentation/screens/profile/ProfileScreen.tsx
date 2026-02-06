@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '@/presentation/components/common/Text';
@@ -10,6 +10,8 @@ import { useNavigation } from '@react-navigation/native';
 import { useAuthStore } from '@/presentation/store/authStore';
 import { useSettingsStore } from '@/presentation/store/settingsStore';
 import { useCustomAlert } from '@/presentation/hooks/useCustomAlert';
+import revenueCatService from '@/services/revenuecat/RevenueCatService';
+import { wp, hp, rs, normalize } from '@/utils/responsive';
 
 export default function ProfileScreen() {
   const navigation = useNavigation<any>();
@@ -51,6 +53,44 @@ export default function ProfileScreen() {
       </Pressable>
     </View>
   );
+
+  const handleManageSubscription = async () => {
+    setLocalLoading(true);
+    try {
+      const managementURL = await revenueCatService.getManagementURL();
+
+      if (managementURL) {
+        const canOpen = await Linking.canOpenURL(managementURL);
+        if (canOpen) {
+          await Linking.openURL(managementURL);
+        } else {
+          showAlert({
+            title: 'Unable to Open',
+            message: 'Could not open subscription management. Please manage your subscription through the App Store or Google Play.',
+            type: 'error',
+            buttons: [{ text: 'OK', style: 'default' }],
+          });
+        }
+      } else {
+        showAlert({
+          title: 'Not Available',
+          message: 'Subscription management is not available at this time. Please try again later.',
+          type: 'error',
+          buttons: [{ text: 'OK', style: 'default' }],
+        });
+      }
+    } catch (error) {
+      console.error('Manage subscription error:', error);
+      showAlert({
+        title: 'Error',
+        message: 'Failed to open subscription management. Please try again.',
+        type: 'error',
+        buttons: [{ text: 'OK', style: 'default' }],
+      });
+    } finally {
+      setLocalLoading(false);
+    }
+  };
 
   const handleLogout = async () => {
     showAlert({
@@ -197,7 +237,7 @@ export default function ProfileScreen() {
               </Text>
             </View>
             {user.subscriptionTier === 'free' && (
-              <Pressable 
+              <Pressable
                 style={styles.upgradeBadge}
                 onPress={() => navigation.navigate('Paywall')}
               >
@@ -205,6 +245,30 @@ export default function ProfileScreen() {
               </Pressable>
             )}
           </View>
+
+          {user.subscriptionTier === 'premium' && (
+            <>
+              <View style={styles.divider} />
+              <Pressable
+                style={styles.manageSubscriptionRow}
+                onPress={handleManageSubscription}
+                disabled={isLoading}
+              >
+                <View style={styles.detailIcon}>
+                  <Ionicons name="settings-outline" size={20} color={COLORS.primary[500]} />
+                </View>
+                <View style={styles.detailTextContainer}>
+                  <Text variant="body" style={styles.manageSubLabel}>
+                    Manage Subscription
+                  </Text>
+                  <Text variant="caption" color={COLORS.text.secondary}>
+                    Cancel or modify your membership
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={COLORS.text.secondary} />
+              </Pressable>
+            </>
+          )}
 
           <View style={styles.divider} />
 
@@ -260,50 +324,50 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: rs(16),
+    paddingVertical: rs(12),
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
   },
   backButton: {
-    padding: 8,
+    padding: rs(8),
   },
   headerTitle: {
     color: '#1B5E20',
   },
   scrollContent: {
-    padding: 20,
+    padding: rs(20),
   },
   authPromptContainer: {
     alignItems: 'center',
-    paddingTop: 40,
+    paddingTop: hp(5),
   },
   iconCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: wp(30),
+    height: wp(30),
+    borderRadius: wp(15),
     backgroundColor: '#E8F5E9',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: rs(24),
   },
   promptTitle: {
     color: '#1B5E20',
-    marginBottom: 12,
+    marginBottom: rs(12),
   },
   promptSubtitle: {
     color: '#6b7280',
-    marginBottom: 40,
-    paddingHorizontal: 20,
-    lineHeight: 22,
+    marginBottom: rs(40),
+    paddingHorizontal: wp(5),
+    lineHeight: normalize(22, 0.3),
   },
   guestButton: {
     width: '80%',
-    marginBottom: 16,
+    marginBottom: rs(16),
   },
   profileCard: {
-    padding: 20,
-    marginBottom: 32,
+    padding: rs(20),
+    marginBottom: rs(32),
     backgroundColor: '#E8F5E9',
     borderColor: '#C8E6C9',
   },
@@ -312,17 +376,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatarCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: wp(15),
+    height: wp(15),
+    borderRadius: wp(7.5),
     backgroundColor: '#4CAF50',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: rs(16),
   },
   avatarText: {
     color: '#ffffff',
-    fontSize: 24,
+    fontSize: normalize(24, 0.4),
     fontWeight: '700',
   },
   profileInfo: {
@@ -330,110 +394,120 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: '#1B5E20',
-    marginBottom: 16,
+    marginBottom: rs(16),
   },
   detailsCard: {
     padding: 0,
-    marginBottom: 40,
+    marginBottom: rs(40),
   },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
+    padding: rs(20),
   },
   detailIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: rs(40),
+    height: rs(40),
+    borderRadius: rs(20),
     backgroundColor: '#f9fafb',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: rs(16),
   },
   detailTextContainer: {
     flex: 1,
   },
   detailLabel: {
-    fontSize: 13,
+    fontSize: normalize(13, 0.3),
     color: '#9ca3af',
-    marginBottom: 2,
+    marginBottom: rs(2),
   },
   detailValue: {
     color: '#111827',
   },
   upgradeBadge: {
     backgroundColor: '#FFC107',
-    paddingVertical: 4,
-    paddingHorizontal: 12,
-    borderRadius: 12,
+    paddingVertical: rs(4),
+    paddingHorizontal: rs(12),
+    borderRadius: rs(12),
   },
   upgradeBadgeText: {
     color: '#7B5E00',
-    fontSize: 12,
+    fontSize: normalize(12, 0.3),
     fontWeight: '700',
   },
   divider: {
     height: 1,
     backgroundColor: '#f3f4f6',
-    marginHorizontal: 20,
+    marginHorizontal: rs(20),
   },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
+    gap: rs(8),
+    paddingVertical: rs(16),
     borderWidth: 1,
     borderColor: '#fca5a5',
-    borderRadius: 12,
+    borderRadius: rs(12),
   },
   logoutText: {
     color: '#F44336',
-    fontSize: 16,
+    fontSize: normalize(16, 0.3),
     fontWeight: '600',
   },
   // Toggle styles
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
+    padding: rs(20),
   },
   toggleIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: rs(40),
+    height: rs(40),
+    borderRadius: rs(20),
     backgroundColor: '#f9fafb',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: rs(16),
   },
   toggleTextContainer: {
     flex: 1,
   },
   toggleLabel: {
-    fontSize: 15,
+    fontSize: normalize(15, 0.3),
     color: '#111827',
-    marginBottom: 2,
+    marginBottom: rs(2),
   },
   toggleButton: {
-    width: 52,
-    height: 32,
-    borderRadius: 16,
+    width: rs(52),
+    height: rs(32),
+    borderRadius: rs(16),
     backgroundColor: '#d1d5db',
     justifyContent: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: rs(4),
   },
   toggleButtonActive: {
     backgroundColor: '#4CAF50',
   },
   toggleKnob: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: rs(24),
+    height: rs(24),
+    borderRadius: rs(12),
     backgroundColor: '#ffffff',
     transform: [{ translateX: 0 }],
   },
   toggleKnobActive: {
-    transform: [{ translateX: 20 }],
+    transform: [{ translateX: rs(20) }],
+  },
+  manageSubscriptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: rs(20),
+  },
+  manageSubLabel: {
+    fontSize: normalize(15, 0.3),
+    color: '#111827',
+    marginBottom: rs(2),
   },
 });

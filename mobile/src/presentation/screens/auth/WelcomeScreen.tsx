@@ -81,22 +81,6 @@ export default function WelcomeScreen() {
               </Text>
             </View>
           </View>
-
-          <View style={styles.featureItem}>
-            <Ionicons
-              name="cloud-outline"
-              size={24}
-              color={COLORS.primary[500]}
-            />
-            <View style={styles.featureText}>
-              <Text variant="body" style={styles.featureTitle}>
-                Sync Across Devices
-              </Text>
-              <Text variant="caption" color={COLORS.text.secondary}>
-                Access your search history from any device
-              </Text>
-            </View>
-          </View>
         </View>
 
         {/* Action Buttons */}

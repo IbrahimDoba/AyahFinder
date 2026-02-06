@@ -12,6 +12,8 @@ interface TextProps {
   color?: string;
   align?: 'left' | 'center' | 'right';
   style?: TextStyle;
+  maxFontSizeMultiplier?: number;
+  numberOfLines?: number;
 }
 
 export function Text({
@@ -20,6 +22,8 @@ export function Text({
   color = COLORS.text.primary,
   align = 'left',
   style,
+  maxFontSizeMultiplier = 1.3, // Limit font scaling to 130% of base size
+  numberOfLines,
 }: TextProps) {
   const textStyle = [
     styles.base,
@@ -28,7 +32,16 @@ export function Text({
     style,
   ];
 
-  return <RNText style={textStyle}>{children}</RNText>;
+  return (
+    <RNText
+      style={textStyle}
+      maxFontSizeMultiplier={maxFontSizeMultiplier}
+      numberOfLines={numberOfLines}
+      allowFontScaling={true}
+    >
+      {children}
+    </RNText>
+  );
 }
 
 const styles = StyleSheet.create({
