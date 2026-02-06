@@ -15,8 +15,8 @@ import { successResponse, handleError } from '@/lib/utils/errors';
  * - EXPIRATION: Subscription expired
  */
 
-// RevenueCat webhook payload (V2 format - data sent directly)
-interface RevenueCatWebhookPayload {
+// RevenueCat webhook event data
+interface RevenueCatEventData {
   type?:
     | 'INITIAL_PURCHASE'
     | 'RENEWAL'
@@ -48,10 +48,30 @@ interface RevenueCatWebhookPayload {
   transaction_id: string;
 }
 
+// V1 format (wrapped in event)
+interface RevenueCatWebhookV1 {
+  api_version: string;
+  event: RevenueCatEventData;
+}
+
+// V2 format (data at root level)
+type RevenueCatWebhookV2 = RevenueCatEventData;
+
 export async function POST(req: NextRequest) {
   try {
-    // RevenueCat sends data directly, not wrapped in "event"
-    const payload: RevenueCatWebhookPayload = await req.json();
+    const body = await req.json();
+
+    // Detect format: V1 has "api_version" and "event" wrapper, V2 is flat
+    let payload: RevenueCatEventData;
+    if ('event' in body && typeof body.event === 'object') {
+      // V1 format
+      console.log('[RevenueCat Webhook] Received V1 format');
+      payload = (body as RevenueCatWebhookV1).event;
+    } else {
+      // V2 format
+      console.log('[RevenueCat Webhook] Received V2 format');
+      payload = body as RevenueCatWebhookV2;
+    }
 
     console.log('[RevenueCat Webhook] Received payload:', {
       type: payload.type,
@@ -119,7 +139,7 @@ export async function POST(req: NextRequest) {
 /**
  * Handle INITIAL_PURCHASE and RENEWAL events
  */
-async function handlePurchase(payload: RevenueCatWebhookPayload, userId: string) {
+async function handlePurchase(payload: RevenueCatEventData, userId: string) {
   const expiresAt = payload.expiration_at_ms
     ? new Date(payload.expiration_at_ms)
     : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // Default 30 days
@@ -161,7 +181,7 @@ async function handlePurchase(payload: RevenueCatWebhookPayload, userId: string)
  * Handle CANCELLATION event
  * Note: User keeps access until expiration date
  */
-async function handleCancellation(payload: RevenueCatWebhookPayload, userId: string) {
+async function handleCancellation(payload: RevenueCatEventData, userId: string) {
   // Update subscription status to cancelled
   await db.subscription.updateMany({
     where: {
@@ -180,7 +200,7 @@ async function handleCancellation(payload: RevenueCatWebhookPayload, userId: str
 /**
  * Handle EXPIRATION event
  */
-async function handleExpiration(payload: RevenueCatWebhookPayload, userId: string) {
+async function handleExpiration(payload: RevenueCatEventData, userId: string) {
   // Mark subscription as expired
   await db.subscription.updateMany({
     where: {
@@ -214,7 +234,7 @@ async function handleExpiration(payload: RevenueCatWebhookPayload, userId: strin
 /**
  * Handle BILLING_ISSUE event
  */
-async function handleBillingIssue(payload: RevenueCatWebhookPayload, userId: string) {
+async function handleBillingIssue(payload: RevenueCatEventData, userId: string) {
   console.log('[RevenueCat Webhook] Billing issue for user:', userId);
   // Could send email notification here
 }
