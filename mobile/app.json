@@ -2,7 +2,7 @@
   "expo": {
     "name": "Ayahfinder App",
     "slug": "ayahfinder-app",
-    "version": "0.6.2",
+    "version": "0.7.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "icon": "./assets/logo-transperant.png",
@@ -21,7 +21,7 @@
     },
     "android": {
       "package": "com.ayahfinder.app",
-      "versionCode": 8,
+      "versionCode": 9,
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS"
