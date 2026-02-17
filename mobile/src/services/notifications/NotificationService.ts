@@ -132,7 +132,7 @@ export async function scheduleReadingReminder(hour: number, minute: number): Pro
     identifier: READING_REMINDER_ID,
     content: {
       title: 'Time to Read Quran',
-      body: 'Your daily reading reminder — open AyahFind and reflect on the words of Allah.',
+      body: 'Your daily reading reminder - open AyahFind and reflect on the words of Allah.',
       sound: true,
       data: { type: 'reading_reminder' },
     },

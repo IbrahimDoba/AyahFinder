@@ -115,7 +115,7 @@ export async function sendReadingReminders(timeSlot: string): Promise<{ sent: nu
   const messages: ExpoPushMessage[] = tokens.map(({ token }) => ({
     to: token,
     title: 'Time to Read Quran',
-    body: 'Your daily reading reminder — open AyahFind and reflect on the words of Allah.',
+    body: 'Your daily reading reminder - open AyahFind and reflect on the words of Allah.',
     data: { type: 'reading_reminder' },
     sound: 'default',
     channelId: 'ayahfinder',
