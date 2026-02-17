@@ -14,6 +14,7 @@ import RootNavigator from './src/presentation/navigation/RootNavigator';
 import { useAuthStore } from './src/presentation/store/authStore';
 import { useSettingsStore } from './src/presentation/store/settingsStore';
 import { REVENUECAT_ANDROID_API_KEY, REVENUECAT_IOS_API_KEY } from '@env';
+import notificationService from './src/services/notifications/NotificationService';
 
 // RevenueCat API Keys
 const REVENUECAT_API_KEYS = {
@@ -24,6 +25,7 @@ const REVENUECAT_API_KEYS = {
 export default function App() {
   const initializeAuth = useAuthStore(state => state.initialize);
   const loadSettings = useSettingsStore(state => state.loadSettings);
+  const setPushToken = useSettingsStore(state => state.setPushToken);
 
   useEffect(() => {
     const init = async () => {
@@ -32,6 +34,14 @@ export default function App() {
         await initializeAuth();
         // Load user settings
         await loadSettings();
+
+        // Initialize push notifications
+        const { user } = useAuthStore.getState();
+        const token = await notificationService.initializeNotifications(!!user);
+        if (token) {
+          setPushToken(token);
+          if (__DEV__) console.log('🔔 PUSH TOKEN:', token);
+        }
 
         // Initialize RevenueCat
         const apiKey = Platform.OS === 'ios'

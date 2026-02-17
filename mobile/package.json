@@ -23,6 +23,7 @@
     "expo-dev-client": "~6.0.20",
     "expo-device": "~8.0.10",
     "expo-font": "~14.0.11",
+    "expo-notifications": "~0.32.16",
     "expo-status-bar": "~3.0.9",
     "heroui-native": "1.0.0-beta.12",
     "immer": "^10.0.3",

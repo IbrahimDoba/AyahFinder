@@ -20,6 +20,10 @@
 .DS_Store
 *.pem
 
+# Firebase service account keys - DO NOT COMMIT
+*firebase-adminsdk*.json
+google-services.json
+
 # debug
 npm-debug.log*
 yarn-debug.log*

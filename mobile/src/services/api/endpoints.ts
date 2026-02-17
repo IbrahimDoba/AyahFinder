@@ -34,6 +34,12 @@ export const ENDPOINTS = {
     SEARCH: '/quran/search',
   },
 
+  // Notifications
+  NOTIFICATIONS: {
+    REGISTER: '/notifications/register',
+    PREFERENCES: '/notifications/preferences',
+  },
+
   // Legacy endpoints (for backward compatibility)
   SURAHS: '/quran/surahs',
   SURAH_BY_ID: (id: number) => `/quran/surahs/${id}`,

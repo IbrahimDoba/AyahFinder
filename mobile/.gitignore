@@ -1,5 +1,6 @@
 # API Keys - DO NOT COMMIT
 src/constants/apiKeys.ts
+google-services.json
 
 # Environment variables
 .env

@@ -55,6 +55,7 @@ model User {
   usageRecords       UsageRecord[]
   subscriptions      Subscription[]
   recognitionHistory RecognitionHistory[]
+  pushTokens         PushToken[]
 
   @@index([email])
   @@index([verificationToken])
@@ -148,6 +149,29 @@ model QuranCache {
 
   @@index([surahNumber, ayahNumber])
   @@map("quran_cache")
+}
+
+// ============================================================================
+// PUSH NOTIFICATIONS TABLE
+// ============================================================================
+
+model PushToken {
+  id             String   @id @default(uuid())
+  userId         String   @map("user_id")
+  token          String   @unique
+  platform       String   // "ios" | "android"
+  // Notification preferences
+  ayahOfDayEnabled     Boolean  @default(true) @map("ayah_of_day_enabled")
+  readingReminderEnabled Boolean @default(false) @map("reading_reminder_enabled")
+  readingReminderTime  String?  @map("reading_reminder_time") // "HH:MM" in user's local time
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_tokens")
 }
 
 // ============================================================================

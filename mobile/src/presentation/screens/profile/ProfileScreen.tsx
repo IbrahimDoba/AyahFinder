@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Pressable, Linking } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable, Linking, Modal, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '@/presentation/components/common/Text';
@@ -11,13 +11,22 @@ import { useAuthStore } from '@/presentation/store/authStore';
 import { useSettingsStore } from '@/presentation/store/settingsStore';
 import { useCustomAlert } from '@/presentation/hooks/useCustomAlert';
 import revenueCatService from '@/services/revenuecat/RevenueCatService';
+import notificationService from '@/services/notifications/NotificationService';
 import { wp, hp, rs, normalize } from '@/utils/responsive';
 
 export default function ProfileScreen() {
   const navigation = useNavigation<any>();
   const { user, isLoading: storeLoading, signOut } = useAuthStore();
-  const { showTranslation, toggleTranslation } = useSettingsStore();
+  const {
+    showTranslation, toggleTranslation,
+    ayahOfDayEnabled, setAyahOfDayEnabled,
+    readingReminderEnabled, setReadingReminderEnabled,
+    readingReminderHour, readingReminderMinute, setReadingReminderTime,
+  } = useSettingsStore();
   const [localLoading, setLocalLoading] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [pickerHour, setPickerHour] = useState(readingReminderHour);
+  const [pickerMinute, setPickerMinute] = useState(readingReminderMinute);
   const { showAlert, AlertComponent } = useCustomAlert();
 
   const isLoading = storeLoading || localLoading;
@@ -52,6 +61,74 @@ export default function ProfileScreen() {
         />
       </Pressable>
     </View>
+  );
+
+  const formatTime = (h: number, m: number) =>
+    `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+
+  const handleEnableReadingReminder = async (value: boolean) => {
+    if (value) {
+      const granted = await notificationService.requestNotificationPermissions();
+      if (!granted) {
+        showAlert({
+          title: 'Notifications Blocked',
+          message: 'Please enable notifications for AyahFinder in your device settings to use reminders.',
+          type: 'warning',
+          buttons: [{ text: 'OK', style: 'default' }],
+        });
+        return;
+      }
+    }
+    setReadingReminderEnabled(value);
+  };
+
+  const handleEnableAyahOfDay = async (value: boolean) => {
+    if (value) {
+      const granted = await notificationService.requestNotificationPermissions();
+      if (!granted) {
+        showAlert({
+          title: 'Notifications Blocked',
+          message: 'Please enable notifications for AyahFinder in your device settings.',
+          type: 'warning',
+          buttons: [{ text: 'OK', style: 'default' }],
+        });
+        return;
+      }
+    }
+    setAyahOfDayEnabled(value);
+    // Sync to server so cron job respects this preference
+    const { pushToken } = useSettingsStore.getState();
+    if (pushToken) {
+      notificationService.syncPreferences(pushToken, value).catch(console.error);
+    }
+  };
+
+  const renderNotificationToggle = (
+    icon: string,
+    label: string,
+    subtitle: string,
+    value: boolean,
+    onToggle: (v: boolean) => void,
+    extra?: React.ReactNode
+  ) => (
+    <>
+      <View style={styles.toggleRow}>
+        <View style={styles.toggleIcon}>
+          <Ionicons name={icon as any} size={20} color={COLORS.primary[500]} />
+        </View>
+        <View style={styles.toggleTextContainer}>
+          <Text variant="body" style={styles.toggleLabel}>{label}</Text>
+          <Text variant="caption" color={COLORS.text.secondary}>{subtitle}</Text>
+        </View>
+        <Pressable
+          style={[styles.toggleButton, value && styles.toggleButtonActive]}
+          onPress={() => onToggle(!value)}
+        >
+          <View style={[styles.toggleKnob, value && styles.toggleKnobActive]} />
+        </Pressable>
+      </View>
+      {extra}
+    </>
   );
 
   const handleManageSubscription = async () => {
@@ -182,6 +259,19 @@ export default function ProfileScreen() {
           <Card style={styles.detailsCard}>
             {renderTranslationToggle()}
           </Card>
+
+          <Text variant="h3" style={styles.sectionTitle}>
+            Notifications
+          </Text>
+          <Card style={styles.detailsCard}>
+            {renderNotificationToggle(
+              'book-outline',
+              'Ayah of the Day',
+              'Sign in to receive daily Quranic verses',
+              false,
+              () => navigation.navigate('Login' as any)
+            )}
+          </Card>
         </ScrollView>
       </SafeAreaView>
     );
@@ -297,6 +387,111 @@ export default function ProfileScreen() {
         <Card style={styles.detailsCard}>
           {renderTranslationToggle()}
         </Card>
+
+        <Text variant="h3" style={styles.sectionTitle}>
+          Notifications
+        </Text>
+        <Card style={styles.detailsCard}>
+          {renderNotificationToggle(
+            'book-outline',
+            'Ayah of the Day',
+            'Receive a daily Quranic verse each morning',
+            ayahOfDayEnabled,
+            handleEnableAyahOfDay
+          )}
+          <View style={styles.divider} />
+          {renderNotificationToggle(
+            'alarm-outline',
+            'Quran Reading Reminder',
+            'Get a daily nudge to read the Quran',
+            readingReminderEnabled,
+            handleEnableReadingReminder,
+            readingReminderEnabled ? (
+              <Pressable
+                style={styles.timePickerRow}
+                onPress={() => {
+                  setPickerHour(readingReminderHour);
+                  setPickerMinute(readingReminderMinute);
+                  setShowTimePicker(true);
+                }}
+              >
+                <Ionicons name="time-outline" size={16} color={COLORS.primary[500]} />
+                <Text variant="caption" color={COLORS.primary[600]} style={{ marginLeft: rs(6) }}>
+                  Reminder time: {formatTime(readingReminderHour, readingReminderMinute)}
+                </Text>
+                <Ionicons name="chevron-forward" size={14} color={COLORS.primary[500]} style={{ marginLeft: rs(4) }} />
+              </Pressable>
+            ) : null
+          )}
+        </Card>
+
+        {/* Time picker modal */}
+        <Modal
+          visible={showTimePicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowTimePicker(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowTimePicker(false)}
+          >
+            <TouchableOpacity activeOpacity={1} style={styles.timePickerModal}>
+              <Text variant="h3" style={styles.timePickerTitle}>Set Reminder Time</Text>
+              <View style={styles.timePickerRow2}>
+                <View style={styles.timeColumn}>
+                  <Text variant="caption" color={COLORS.text.secondary} align="center">Hour</Text>
+                  <ScrollView style={styles.timeScroll} showsVerticalScrollIndicator={false}>
+                    {Array.from({ length: 24 }, (_, i) => (
+                      <Pressable
+                        key={i}
+                        style={[styles.timeItem, pickerHour === i && styles.timeItemSelected]}
+                        onPress={() => setPickerHour(i)}
+                      >
+                        <Text
+                          variant="body"
+                          style={pickerHour === i ? styles.timeItemTextSelected : styles.timeItemText}
+                        >
+                          {String(i).padStart(2, '0')}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </View>
+                <Text variant="h2" style={styles.timeSeparator}>:</Text>
+                <View style={styles.timeColumn}>
+                  <Text variant="caption" color={COLORS.text.secondary} align="center">Minute</Text>
+                  <ScrollView style={styles.timeScroll} showsVerticalScrollIndicator={false}>
+                    {[0, 15, 30, 45].map((m) => (
+                      <Pressable
+                        key={m}
+                        style={[styles.timeItem, pickerMinute === m && styles.timeItemSelected]}
+                        onPress={() => setPickerMinute(m)}
+                      >
+                        <Text
+                          variant="body"
+                          style={pickerMinute === m ? styles.timeItemTextSelected : styles.timeItemText}
+                        >
+                          {String(m).padStart(2, '0')}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </View>
+              </View>
+              <HeroButton
+                title={`Set to ${formatTime(pickerHour, pickerMinute)}`}
+                variant="primary"
+                onPress={() => {
+                  setReadingReminderTime(pickerHour, pickerMinute);
+                  setShowTimePicker(false);
+                }}
+                style={{ marginTop: rs(16) }}
+              />
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
 
         <Pressable style={styles.logoutButton} onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={20} color={COLORS.error} />
@@ -509,5 +704,67 @@ const styles = StyleSheet.create({
     fontSize: normalize(15, 0.3),
     color: '#111827',
     marginBottom: rs(2),
+  },
+  timePickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: rs(20),
+    paddingBottom: rs(16),
+    marginTop: rs(-4),
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  timePickerModal: {
+    backgroundColor: '#ffffff',
+    borderRadius: rs(16),
+    padding: rs(24),
+    width: '80%',
+  },
+  timePickerTitle: {
+    color: '#1B5E20',
+    marginBottom: rs(20),
+    textAlign: 'center',
+  },
+  timePickerRow2: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timeColumn: {
+    width: rs(80),
+    alignItems: 'center',
+  },
+  timeScroll: {
+    height: rs(150),
+    marginTop: rs(8),
+  },
+  timeItem: {
+    paddingVertical: rs(10),
+    paddingHorizontal: rs(16),
+    borderRadius: rs(8),
+    marginVertical: rs(2),
+  },
+  timeItemSelected: {
+    backgroundColor: '#E8F5E9',
+  },
+  timeItemText: {
+    color: '#374151',
+    fontSize: normalize(18, 0.3),
+    textAlign: 'center',
+  },
+  timeItemTextSelected: {
+    color: '#1B5E20',
+    fontWeight: '700',
+    fontSize: normalize(18, 0.3),
+    textAlign: 'center',
+  },
+  timeSeparator: {
+    color: '#1B5E20',
+    marginHorizontal: rs(8),
+    marginTop: rs(24),
   },
 });
