@@ -21,7 +21,7 @@ import { AudioRecorder } from '@/services/audio/AudioRecorder';
 import { useRealTimeRecognition } from '@/presentation/hooks/useRealTimeRecognition';
 import serverUsageService from '@/services/usage/ServerUsageService';
 import { UpgradePrompt } from '@/presentation/components/usage/UpgradePrompt';
-import { useCustomAlert } from '@/presentation/hooks/useCustomAlert';
+import { showAlert } from '@/presentation/store/alertStore';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -31,7 +31,6 @@ export default function HomeScreen() {
   const { isRecording, setRecording, isProcessing, setProcessing } =
     useRecognitionStore();
   const { user } = useAuthStore();
-  const { showAlert, AlertComponent } = useCustomAlert();
 
   // Refs to prevent multiple stop calls and track match state
   const isStoppingRef = useRef(false);
@@ -521,18 +520,14 @@ export default function HomeScreen() {
 
         {/* Instructions */}
         <View style={styles.instructions}>
-          {isProcessing ? (
-            <Text variant="body" align="center" color={COLORS.primary[500]}>
-              Processing audio...
-            </Text>
-          ) : (
+          {!isProcessing && (
             <>
               <Text
                 variant="caption"
                 align="center"
                 color={COLORS.text.secondary}
               >
-                Tap the button and play a Quran recitation
+                Recite a verse or play a recitation near your phone
               </Text>
               <Text
                 variant="caption"
@@ -559,8 +554,6 @@ export default function HomeScreen() {
         />
       )}
 
-      {/* Custom Alert */}
-      <AlertComponent />
     </SafeAreaView>
   );
 }

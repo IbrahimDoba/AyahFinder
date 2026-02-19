@@ -15,6 +15,8 @@ const SETTINGS_KEY = '@ayahfinder:settings';
 interface SettingsState {
   // Settings
   showTranslation: boolean;
+  hasSeenOnboarding: boolean;
+  isSettingsLoaded: boolean;
 
   // Notification preferences
   pushToken: string | null;
@@ -26,6 +28,7 @@ interface SettingsState {
   // Actions
   toggleTranslation: () => void;
   setShowTranslation: (value: boolean) => void;
+  setHasSeenOnboarding: (value: boolean) => void;
   setPushToken: (token: string | null) => void;
   setAyahOfDayEnabled: (value: boolean) => void;
   setReadingReminderEnabled: (value: boolean) => void;
@@ -36,6 +39,8 @@ interface SettingsState {
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   // Defaults
   showTranslation: true,
+  hasSeenOnboarding: false,
+  isSettingsLoaded: false,
   pushToken: null,
   ayahOfDayEnabled: true,
   readingReminderEnabled: false,
@@ -50,6 +55,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   setShowTranslation: (value: boolean) => {
     set({ showTranslation: value });
+    _persist(get());
+  },
+
+  setHasSeenOnboarding: (value: boolean) => {
+    set({ hasSeenOnboarding: value });
     _persist(get());
   },
 
@@ -89,6 +99,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         const parsed = JSON.parse(stored);
         set({
           showTranslation: parsed.showTranslation ?? true,
+          hasSeenOnboarding: parsed.hasSeenOnboarding ?? false,
           pushToken: parsed.pushToken ?? null,
           ayahOfDayEnabled: parsed.ayahOfDayEnabled ?? true,
           readingReminderEnabled: parsed.readingReminderEnabled ?? false,
@@ -106,6 +117,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       }
     } catch (error) {
       console.error('Error loading settings:', error);
+    } finally {
+      set({ isSettingsLoaded: true });
     }
   },
 }));
@@ -113,6 +126,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 function _persist(state: SettingsState) {
   const toSave = {
     showTranslation: state.showTranslation,
+    hasSeenOnboarding: state.hasSeenOnboarding,
     pushToken: state.pushToken,
     ayahOfDayEnabled: state.ayahOfDayEnabled,
     readingReminderEnabled: state.readingReminderEnabled,

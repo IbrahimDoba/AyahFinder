@@ -9,8 +9,8 @@ import { COLORS } from '@/constants/colors';
 import { useNavigation } from '@react-navigation/native';
 import { useAuthStore } from '@/presentation/store/authStore';
 import { useSettingsStore } from '@/presentation/store/settingsStore';
-import { useCustomAlert } from '@/presentation/hooks/useCustomAlert';
 import revenueCatService from '@/services/revenuecat/RevenueCatService';
+import { showAlert } from '@/presentation/store/alertStore';
 import notificationService from '@/services/notifications/NotificationService';
 import { wp, hp, rs, normalize } from '@/utils/responsive';
 
@@ -22,12 +22,12 @@ export default function ProfileScreen() {
     ayahOfDayEnabled, setAyahOfDayEnabled,
     readingReminderEnabled, setReadingReminderEnabled,
     readingReminderHour, readingReminderMinute, setReadingReminderTime,
+    setHasSeenOnboarding,
   } = useSettingsStore();
   const [localLoading, setLocalLoading] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [pickerHour, setPickerHour] = useState(readingReminderHour);
   const [pickerMinute, setPickerMinute] = useState(readingReminderMinute);
-  const { showAlert, AlertComponent } = useCustomAlert();
 
   const isLoading = storeLoading || localLoading;
   
@@ -493,14 +493,22 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </Modal>
 
+        {__DEV__ && (
+          <Pressable
+            style={styles.devButton}
+            onPress={() => setHasSeenOnboarding(false)}
+          >
+            <Ionicons name="refresh-outline" size={16} color="#9ca3af" />
+            <Text style={styles.devButtonText}>DEV: Reset Onboarding</Text>
+          </Pressable>
+        )}
+
         <Pressable style={styles.logoutButton} onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={20} color={COLORS.error} />
           <Text style={styles.logoutText}>Logout</Text>
         </Pressable>
       </ScrollView>
 
-      {/* Custom Alert */}
-      <AlertComponent />
     </SafeAreaView>
   );
 }
@@ -635,6 +643,23 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#f3f4f6',
     marginHorizontal: rs(20),
+  },
+  devButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: rs(6),
+    paddingVertical: rs(10),
+    marginBottom: rs(12),
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: rs(8),
+    borderStyle: 'dashed',
+  },
+  devButtonText: {
+    color: '#9ca3af',
+    fontSize: 13,
+    fontWeight: '500',
   },
   logoutButton: {
     flexDirection: 'row',

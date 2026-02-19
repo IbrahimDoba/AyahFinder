@@ -9,10 +9,12 @@ import { View, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import HomeScreen from '../screens/home/HomeScreen';
 import QuranListScreen from '../screens/quran/QuranListScreen';
+import BookmarksScreen from '../screens/bookmarks/BookmarksScreen';
 
 export type TabParamList = {
   Finder: undefined;
   Quran: undefined;
+  Bookmarks: undefined;
 };
 
 const Tab = createBottomTabNavigator<TabParamList>();
@@ -54,7 +56,10 @@ export default function TabNavigator() {
         },
         tabBarIcon: ({ focused, color }) => {
           const iconSize = focused ? 26 : 24;
-          const iconName = route.name === 'Finder' ? 'mic' : 'book';
+          let iconName: React.ComponentProps<typeof Ionicons>['name'];
+          if (route.name === 'Finder') iconName = focused ? 'mic' : 'mic-outline';
+          else if (route.name === 'Quran') iconName = focused ? 'book' : 'book-outline';
+          else iconName = focused ? 'bookmark' : 'bookmark-outline';
 
           return (
             <View
@@ -81,6 +86,13 @@ export default function TabNavigator() {
         component={QuranListScreen}
         options={{
           tabBarLabel: 'Quran',
+        }}
+      />
+      <Tab.Screen
+        name="Bookmarks"
+        component={BookmarksScreen}
+        options={{
+          tabBarLabel: 'Bookmarks',
         }}
       />
     </Tab.Navigator>

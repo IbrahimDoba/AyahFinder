@@ -11,6 +11,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { HeroUINativeProvider } from 'heroui-native';
 import Purchases, { LOG_LEVEL } from 'react-native-purchases';
 import RootNavigator from './src/presentation/navigation/RootNavigator';
+import GlobalAlert from './src/presentation/components/common/GlobalAlert';
 import { useAuthStore } from './src/presentation/store/authStore';
 import { useSettingsStore } from './src/presentation/store/settingsStore';
 import { REVENUECAT_ANDROID_API_KEY, REVENUECAT_IOS_API_KEY } from '@env';
@@ -71,6 +72,7 @@ export default function App() {
         <SafeAreaProvider>
           <StatusBar style="auto" />
           <RootNavigator />
+          <GlobalAlert />
         </SafeAreaProvider>
       </HeroUINativeProvider>
     </GestureHandlerRootView>

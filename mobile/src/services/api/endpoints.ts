@@ -34,6 +34,13 @@ export const ENDPOINTS = {
     SEARCH: '/quran/search',
   },
 
+  // Bookmarks
+  BOOKMARKS: {
+    LIST: '/bookmarks',
+    ADD: '/bookmarks',
+    REMOVE: (id: string) => `/bookmarks/${id}`,
+  },
+
   // Notifications
   NOTIFICATIONS: {
     REGISTER: '/notifications/register',

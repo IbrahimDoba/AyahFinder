@@ -246,6 +246,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       await authService.logout();
       get().setUser(null);
+      // Clear bookmark cache so stale data isn't shown on next login
+      const { useBookmarkStore } = require('@/presentation/store/bookmarkStore');
+      useBookmarkStore.getState().clearBookmarks();
 
       console.log('✅ Sign out successful');
     } catch (error: any) {

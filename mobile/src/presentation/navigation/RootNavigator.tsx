@@ -7,7 +7,11 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuthStore } from '../store/authStore';
+import { useSettingsStore } from '../store/settingsStore';
 import { COLORS } from '../../constants';
+
+// Onboarding
+import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
 
 // Auth Screens
 import WelcomeScreen from '../screens/auth/WelcomeScreen';
@@ -23,6 +27,9 @@ import PaywallScreen from '../screens/subscription/PaywallScreen';
 import { Text } from '../components/common/Text';
 
 export type RootStackParamList = {
+  // Onboarding
+  Onboarding: undefined;
+
   // Auth Flow
   Welcome: undefined;
   Login: undefined;
@@ -89,12 +96,18 @@ function LoadingScreen() {
 
 export default function RootNavigator() {
   const { user, isInitialized } = useAuthStore();
+  const { hasSeenOnboarding, isSettingsLoaded } = useSettingsStore();
 
   return (
     <NavigationContainer>
-      {!isInitialized ? (
-        // Show loading while checking auth state
+      {!isInitialized || !isSettingsLoaded ? (
+        // Show loading while checking auth state and loading settings
         <LoadingScreen />
+      ) : !hasSeenOnboarding ? (
+        // First launch — show onboarding
+        <Stack.Navigator screenOptions={{ headerShown: false, animation: 'fade' }}>
+          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+        </Stack.Navigator>
       ) : (
         <Stack.Navigator
           screenOptions={{

@@ -56,6 +56,7 @@ model User {
   subscriptions      Subscription[]
   recognitionHistory RecognitionHistory[]
   pushTokens         PushToken[]
+  bookmarks          Bookmark[]
 
   @@index([email])
   @@index([verificationToken])
@@ -172,6 +173,27 @@ model PushToken {
 
   @@index([userId])
   @@map("push_tokens")
+}
+
+// ============================================================================
+// BOOKMARKS TABLE
+// ============================================================================
+
+model Bookmark {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  surahNumber Int      @map("surah_number")
+  surahName   String   @map("surah_name")
+  ayahNumber  Int      @map("ayah_number")
+  arabicText  String   @map("arabic_text") @db.Text
+  translation String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, surahNumber, ayahNumber])
+  @@index([userId])
+  @@map("bookmarks")
 }
 
 // ============================================================================

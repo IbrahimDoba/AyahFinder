@@ -1,113 +1,115 @@
 /**
  * Pulse Animation Component
- * Animated pulse effect for listen button
+ * Three staggered ripple rings that scale outward from the button.
+ *
+ * Renders as absolute-fill children inside the parent buttonArea (160×160).
+ * Each ring starts at 100% the button size and scales up via transform — so
+ * no explicit centering coordinates are needed and the rings always align
+ * perfectly with the button regardless of where PulseAnimation is placed.
  */
-import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, View } from 'react-native';
-import { COLORS } from '@/constants';
+import React, { useEffect } from 'react';
+import { StyleSheet } from 'react-native';
+import Animated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
+
+// Ease-out curve: fast start, decelerates — looks natural for expanding rings
+const EASE_OUT = Easing.bezier(0, 0, 0.2, 1);
+const PULSE_DURATION = 2000;
+
+interface PulseRingProps {
+  delay: number;
+  color: string;
+  isActive: boolean;
+}
+
+function PulseRing({ delay, color, isActive }: PulseRingProps) {
+  const scale = useSharedValue(1);
+  const opacity = useSharedValue(0);
+
+  useEffect(() => {
+    if (isActive) {
+      // Reset before starting
+      scale.value = 1;
+      opacity.value = 0;
+
+      scale.value = withDelay(
+        delay,
+        withRepeat(
+          withSequence(
+            withTiming(1, { duration: 0 }),
+            withTiming(2.6, { duration: PULSE_DURATION, easing: EASE_OUT }),
+          ),
+          -1,
+          false,
+        ),
+      );
+
+      opacity.value = withDelay(
+        delay,
+        withRepeat(
+          withSequence(
+            withTiming(0.5, { duration: 0 }),
+            withTiming(0, { duration: PULSE_DURATION, easing: EASE_OUT }),
+          ),
+          -1,
+          false,
+        ),
+      );
+    } else {
+      cancelAnimation(scale);
+      cancelAnimation(opacity);
+      // Fade out fast at current scale — rings dissolve in place rather than
+      // shrinking back in (which looked wrong while the processing UI appeared)
+      opacity.value = withTiming(0, { duration: 180 });
+    }
+  }, [isActive]);
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.View
+      style={[styles.ring, { backgroundColor: color }, animStyle]}
+    />
+  );
+}
 
 interface PulseAnimationProps {
   isActive: boolean;
-  size?: number;
+  color?: string;
 }
 
-export function PulseAnimation({ isActive, size = 200 }: PulseAnimationProps) {
-  const pulse1 = useRef(new Animated.Value(1)).current;
-  const pulse2 = useRef(new Animated.Value(1)).current;
-  const opacity1 = useRef(new Animated.Value(0.7)).current;
-  const opacity2 = useRef(new Animated.Value(0.5)).current;
-
-  useEffect(() => {
-    if (!isActive) {
-      // Reset
-      pulse1.setValue(1);
-      pulse2.setValue(1);
-      opacity1.setValue(0.7);
-      opacity2.setValue(0.5);
-      return;
-    }
-
-    // Start pulsing animations
-    const animation1 = Animated.loop(
-      Animated.parallel([
-        Animated.timing(pulse1, {
-          toValue: 1.5,
-          duration: 1500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacity1, {
-          toValue: 0,
-          duration: 1500,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-
-    const animation2 = Animated.loop(
-      Animated.parallel([
-        Animated.timing(pulse2, {
-          toValue: 1.8,
-          duration: 1500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacity2, {
-          toValue: 0,
-          duration: 1500,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-
-    // Start second animation with delay
-    setTimeout(() => animation2.start(), 300);
-    animation1.start();
-
-    return () => {
-      animation1.stop();
-      animation2.stop();
-    };
-  }, [isActive]);
-
-  if (!isActive) return null;
-
+/**
+ * Must be placed inside a View with explicit width/height (the "anchor").
+ * The rings use absoluteFillObject, so they inherit the anchor's dimensions
+ * and scale outward from its center.
+ */
+export function PulseAnimation({
+  isActive,
+  color = 'rgba(129,199,132,0.6)',
+}: PulseAnimationProps) {
   return (
-    <View style={[styles.container, { width: size, height: size }]}>
-      <Animated.View
-        style={[
-          styles.pulse,
-          {
-            width: size,
-            height: size,
-            borderRadius: size / 2,
-            transform: [{ scale: pulse1 }],
-            opacity: opacity1,
-          },
-        ]}
-      />
-      <Animated.View
-        style={[
-          styles.pulse,
-          {
-            width: size,
-            height: size,
-            borderRadius: size / 2,
-            transform: [{ scale: pulse2 }],
-            opacity: opacity2,
-          },
-        ]}
-      />
-    </View>
+    <>
+      <PulseRing delay={0} color={color} isActive={isActive} />
+      <PulseRing delay={666} color={color} isActive={isActive} />
+      <PulseRing delay={1333} color={color} isActive={isActive} />
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  pulse: {
-    position: 'absolute',
-    backgroundColor: COLORS.primary[500],
+  ring: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 9999,
   },
 });

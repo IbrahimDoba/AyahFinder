@@ -19,50 +19,68 @@ import { Ionicons } from '@expo/vector-icons';
 
 import serverQuranService from '@/services/quran/ServerQuranService';
 import { useSettingsStore } from '@/presentation/store/settingsStore';
+import { useBookmarkStore } from '@/presentation/store/bookmarkStore';
+import { useAuthStore } from '@/presentation/store/authStore';
+import { showAlert } from '@/presentation/store/alertStore';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Surah'>;
+
+/**
+ * Traditional Quran verse-end ornament.
+ * Double-ring circle with the ayah number in Arabic-Indic numerals.
+ */
+function AyahMarker({
+  number,
+  highlighted,
+}: {
+  number: number;
+  highlighted: boolean;
+}) {
+  return (
+    <View style={[styles.markerOuter, highlighted && styles.markerOuterHL]}>
+      <View style={[styles.markerInner, highlighted && styles.markerInnerHL]}>
+        <RNText
+          style={[styles.markerText, highlighted && styles.markerTextHL]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+        >
+          {number}
+        </RNText>
+      </View>
+    </View>
+  );
+}
 
 export default function SurahScreen({ navigation, route }: Props) {
   const { surahNumber, surahName, highlightAyah, fromRecognition } =
     route.params;
   const [ayahs, setAyahs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Get settings
   const { showTranslation } = useSettingsStore();
-
-  // Refs for auto-scroll
+  const { user } = useAuthStore();
+  const { isBookmarked, getBookmarkId, addBookmark, removeBookmark, loadBookmarks } =
+    useBookmarkStore();
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
     fetchSurahAyahs();
   }, [surahNumber]);
 
-  // Auto-scroll to highlighted ayah after loading
   useEffect(() => {
     let timer: NodeJS.Timeout;
     let retryTimer: NodeJS.Timeout;
-    
-    if (!loading && highlightAyah && ayahs.length > 0) {
-      // Find the index of the ayah to scroll to
-      const ayahIndex = ayahs.findIndex(
-        ayah => (ayah.numberInSurah || ayah.ayahNumber) === highlightAyah
-      );
 
+    if (!loading && highlightAyah && ayahs.length > 0) {
+      const ayahIndex = ayahs.findIndex(
+        a => (a.numberInSurah || a.ayahNumber) === highlightAyah
+      );
       if (ayahIndex !== -1) {
-        console.log(
-          `📍 Scrolling to ayah ${highlightAyah} (index ${ayahIndex})`
-        );
-        
-        // First attempt after layout is likely complete
         timer = setTimeout(() => {
           flatListRef.current?.scrollToIndex({
             index: ayahIndex,
             animated: true,
-            viewPosition: 0.25, // Position item 25% from top for better visibility
+            viewPosition: 0.25,
           });
-          
-          // Retry once more after animation to ensure correct position
           retryTimer = setTimeout(() => {
             flatListRef.current?.scrollToIndex({
               index: ayahIndex,
@@ -79,24 +97,41 @@ export default function SurahScreen({ navigation, route }: Props) {
     };
   }, [loading, highlightAyah, ayahs]);
 
+  // Load bookmarks so we can show correct filled/outline state
+  useEffect(() => {
+    if (user) loadBookmarks();
+  }, [user]);
+
+  const handleBookmarkToggle = async (ayah: any) => {
+    if (!user) {
+      navigation.navigate('Login' as any);
+      return;
+    }
+    const ayahNum = ayah.numberInSurah || ayah.ayahNumber;
+    const bookmarkId = getBookmarkId(surahNumber, ayahNum);
+
+    if (bookmarkId) {
+      await removeBookmark(bookmarkId);
+    } else {
+      const result = await addBookmark({
+        surahNumber,
+        surahName,
+        ayahNumber: ayahNum,
+        arabicText: ayah.arabicText || ayah.text,
+        translation: ayah.translation ?? null,
+      });
+      if (result.error) {
+        showAlert({ title: 'Bookmark', message: result.error, type: 'error' });
+      }
+    }
+  };
+
   const fetchSurahAyahs = async () => {
     try {
       setLoading(true);
-      console.log(`📖 Loading Surah ${surahNumber} from server...`);
-
       const surahData = await serverQuranService.getSurah(surahNumber);
-
-      if (surahData && surahData.verses) {
-        setAyahs(surahData.verses);
-        console.log(
-          `✅ Loaded ${surahData.verses.length} verses for Surah ${surahNumber}`
-        );
-      } else {
-        console.error(`No verses found for Surah ${surahNumber}`);
-        setAyahs([]);
-      }
-    } catch (error) {
-      console.error('Error loading surah from server:', error);
+      setAyahs(surahData?.verses ?? []);
+    } catch {
       setAyahs([]);
     } finally {
       setLoading(false);
@@ -118,13 +153,12 @@ export default function SurahScreen({ navigation, route }: Props) {
             {surahName}
           </Text>
           <Text variant="caption" align="center" color={COLORS.text.secondary}>
-            Surah {surahNumber}
+            {'Surah ' + surahNumber}
           </Text>
         </View>
         <View style={styles.placeholder} />
       </View>
 
-      {/* Content */}
       {loading ? (
         <View style={styles.loadingContainer}>
           <RNText style={styles.loadingText}>Loading verses...</RNText>
@@ -136,18 +170,12 @@ export default function SurahScreen({ navigation, route }: Props) {
           keyExtractor={item => item.number.toString()}
           style={styles.scrollView}
           contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={true}
-          // Note: We don't use getItemLayout because verses vary greatly in height
-          // FlatList will measure items automatically for accurate scrolling
+          showsVerticalScrollIndicator={false}
           onScrollToIndexFailed={info => {
-            // Fallback: scroll to approximate offset based on average item length
-            console.warn('ScrollToIndex failed, using offset fallback:', info);
-            const fallbackOffset = info.averageItemLength * info.index;
             flatListRef.current?.scrollToOffset({
-              offset: fallbackOffset,
+              offset: info.averageItemLength * info.index,
               animated: true,
             });
-            // Try again after a delay once items are laid out
             setTimeout(() => {
               flatListRef.current?.scrollToIndex({
                 index: info.index,
@@ -156,74 +184,73 @@ export default function SurahScreen({ navigation, route }: Props) {
               });
             }, 300);
           }}
-          // Performance optimizations to prevent glitchy scrolling
           maxToRenderPerBatch={20}
           windowSize={15}
           updateCellsBatchingPeriod={50}
-          maintainVisibleContentPosition={undefined}
           ListHeaderComponent={
             surahNumber !== 9 && surahNumber !== 1 ? (
               <View style={styles.bismillahContainer}>
-                <Text variant="h2" align="center" style={styles.bismillah}>
+                <View style={styles.bismillahRule} />
+                <Text variant="h2" align="center" style={styles.bismillahText}>
                   بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
                 </Text>
+                <View style={styles.bismillahRule} />
               </View>
             ) : null
           }
           renderItem={({ item: ayah, index }) => {
-            const isHighlighted = ayah.numberInSurah === highlightAyah;
+            const ayahNum = ayah.numberInSurah || ayah.ayahNumber;
+            const isHighlighted = ayahNum === highlightAyah;
+            const bookmarked = isBookmarked(surahNumber, ayahNum);
 
             return (
               <View
                 style={[
-                  styles.ayahContainer,
-                  index % 2 === 0 ? styles.ayahOdd : styles.ayahEven,
-                  isHighlighted && {
-                    backgroundColor: '#E8F5E9',
-                    borderLeftWidth: 4,
-                    borderLeftColor: '#4CAF50',
-                  },
+                  styles.ayahRow,
+                  index > 0 && styles.ayahDivider,
+                  isHighlighted && styles.ayahRowHL,
                 ]}
               >
-                {/* Ayah Number on Left */}
-                <View
-                  style={[
-                    styles.ayahNumberContainer,
-                    isHighlighted && styles.ayahNumberHighlighted,
-                  ]}
-                >
-                  <RNText
-                    style={[
-                      styles.ayahNumberText,
-                      isHighlighted && styles.ayahNumberTextHighlighted,
-                    ]}
-                  >
-                    {ayah.numberInSurah || ayah.ayahNumber}
-                  </RNText>
-                </View>
+                {/* Ornamental verse marker */}
+                <AyahMarker number={ayahNum} highlighted={isHighlighted} />
 
-                {/* Ayah Text */}
-                <View style={styles.ayahTextContainer}>
-                  {isHighlighted && fromRecognition && (
-                    <Text
-                      variant="caption"
-                      style={styles.matchLabel}
-                      color={COLORS.info}
+                {/* Verse text */}
+                <View style={styles.verseContent}>
+                  {/* Top row: matched badge + bookmark button */}
+                  <View style={styles.ayahTopRow}>
+                    {isHighlighted && fromRecognition ? (
+                      <View style={styles.matchBadge}>
+                        <Ionicons
+                          name="musical-notes"
+                          size={11}
+                          color={COLORS.primary[700]}
+                        />
+                        <RNText style={styles.matchBadgeText}>
+                          Matched Verse
+                        </RNText>
+                      </View>
+                    ) : (
+                      <View />
+                    )}
+                    <TouchableOpacity
+                      onPress={() => handleBookmarkToggle(ayah)}
+                      hitSlop={8}
                     >
-                      🎯 Matched Verse
-                    </Text>
-                  )}
-                  
-                  {/* Arabic Text */}
-                  <Text variant="arabic" style={styles.ayahText}>
+                      <Ionicons
+                        name={bookmarked ? 'bookmark' : 'bookmark-outline'}
+                        size={18}
+                        color={bookmarked ? COLORS.primary[600] : '#d1d5db'}
+                      />
+                    </TouchableOpacity>
+                  </View>
+
+                  <Text variant="arabic" style={styles.arabicText}>
                     {ayah.arabicText || ayah.text}
                   </Text>
-                  
-                  {/* English Translation (if enabled) */}
                   {showTranslation && ayah.translation && (
                     <Text
                       variant="body"
-                      style={styles.translationText}
+                      style={styles.translation}
                       color={COLORS.text.secondary}
                     >
                       {ayah.translation}
@@ -239,111 +266,145 @@ export default function SurahScreen({ navigation, route }: Props) {
   );
 }
 
+const MARKER_OUTER = 46;
+const MARKER_INNER = 34;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background.default,
+    backgroundColor: '#FAFDF9',
   },
+
+  // ── Header ───────────────────────────────────────────────────────────────
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: COLORS.border.light,
   },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  placeholder: {
-    width: 40,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#6b7280',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  content: {
-    paddingBottom: 200, // Extra padding to allow last items to scroll into full view
-  },
+  backButton: { padding: 8 },
+  headerTitle: { flex: 1, alignItems: 'center' },
+  placeholder: { width: 40 },
+
+  // ── States ───────────────────────────────────────────────────────────────
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { fontSize: 16, color: '#6b7280' },
+  scrollView: { flex: 1 },
+  content: { paddingBottom: 200 },
+
+  // ── Bismillah ────────────────────────────────────────────────────────────
   bismillahContainer: {
-    paddingVertical: 24,
-    paddingHorizontal: 16,
-    marginBottom: 2,
-    backgroundColor: '#E8F5E9',
-    borderBottomWidth: 1,
-    borderBottomColor: '#C8E6C9',
+    paddingVertical: 28,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    gap: 14,
   },
-  bismillah: {
-    fontSize: 26,
+  bismillahRule: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: COLORS.primary[200],
+    alignSelf: 'stretch',
+  },
+  bismillahText: {
+    fontSize: 24,
     lineHeight: 44,
-    color: '#1B5E20',
+    color: COLORS.primary[900],
   },
-  ayahContainer: {
+
+  // ── Ayah rows ────────────────────────────────────────────────────────────
+  ayahRow: {
     flexDirection: 'row',
     paddingVertical: 20,
     paddingHorizontal: 16,
-    marginBottom: 2,
     alignItems: 'flex-start',
+    backgroundColor: '#FAFDF9',
   },
-  ayahOdd: {
-    backgroundColor: '#f9fafb', // Very light gray
+  ayahDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E5E7EB',
   },
-  ayahEven: {
-    backgroundColor: '#ffffff', // White
+  ayahRowHL: {
+    backgroundColor: '#F1F8F1',
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.primary[500],
   },
-  ayahNumberContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#E8F5E9',
-    justifyContent: 'center',
+
+  // ── Verse marker (double-ring ornament) ──────────────────────────────────
+  markerOuter: {
+    width: MARKER_OUTER,
+    height: MARKER_OUTER,
+    borderRadius: MARKER_OUTER / 2,
+    borderWidth: 1,
+    borderColor: COLORS.primary[200],
     alignItems: 'center',
-    marginRight: 16,
-    marginTop: 4,
+    justifyContent: 'center',
+    marginRight: 14,
+    marginTop: 6,
+    flexShrink: 0,
   },
-  ayahNumberHighlighted: {
-    backgroundColor: '#4CAF50',
+  markerOuterHL: {
+    borderColor: COLORS.primary[400],
   },
-  ayahNumberText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2E7D32',
+  markerInner: {
+    width: MARKER_INNER,
+    height: MARKER_INNER,
+    borderRadius: MARKER_INNER / 2,
+    backgroundColor: COLORS.primary[50],
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  ayahNumberTextHighlighted: {
-    color: '#ffffff',
+  markerInnerHL: {
+    backgroundColor: COLORS.primary[600],
   },
-  ayahTextContainer: {
-    flex: 1,
+  markerText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.primary[800],
+    includeFontPadding: false,
   },
-  ayahText: {
+  markerTextHL: {
+    color: '#fff',
+  },
+
+  // ── Verse content ─────────────────────────────────────────────────────────
+  verseContent: { flex: 1 },
+  ayahTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  arabicText: {
     fontSize: 28,
     lineHeight: 56,
     textAlign: 'right',
     color: '#111827',
   },
-  translationText: {
+  translation: {
     fontSize: 15,
     lineHeight: 24,
     textAlign: 'left',
     marginTop: 12,
     paddingTop: 12,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#E5E7EB',
   },
-  matchLabel: {
+
+  // ── Match badge ───────────────────────────────────────────────────────────
+  matchBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     marginBottom: 8,
+    alignSelf: 'flex-end',
+  },
+  matchBadgeText: {
+    fontSize: 12,
     fontWeight: '600',
+    color: COLORS.primary[700],
   },
 });

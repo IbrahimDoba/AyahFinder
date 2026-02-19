@@ -1,6 +1,6 @@
 /**
  * Quran List Screen
- * Displays list of all Surahs with HeroUI Native components
+ * Displays all 114 Surahs with Arabic-Indic numbered ornament badges
  */
 import React, { useState, useEffect } from 'react';
 import {
@@ -15,9 +15,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/presentation/navigation/RootNavigator';
-import { Chip, Card } from 'heroui-native';
+import { Chip } from 'heroui-native';
 import { Ionicons } from '@expo/vector-icons';
 import serverQuranService from '@/services/quran/ServerQuranService';
+import { COLORS } from '@/constants';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -28,6 +29,22 @@ interface Surah {
   englishNameTranslation: string;
   revelationType: string;
   numberOfAyahs: number;
+}
+
+/**
+ * Double-ring ornamental badge — same language as the SurahScreen verse marker.
+ * Used here to show the surah number in Arabic-Indic numerals.
+ */
+function SurahBadge({ number }: { number: number }) {
+  return (
+    <View style={styles.badgeOuter}>
+      <View style={styles.badgeInner}>
+        <RNText style={styles.badgeText} numberOfLines={1} adjustsFontSizeToFit>
+          {number}
+        </RNText>
+      </View>
+    </View>
+  );
 }
 
 export default function QuranListScreen() {
@@ -44,15 +61,10 @@ export default function QuranListScreen() {
     try {
       setLoading(true);
       setError(null);
-
-      // Force clear cache once to get fresh data from server (fixes stale 1-surah cache)
-      console.log('[Quran] Clearing cache to force fresh data...');
       await serverQuranService.clearCache();
-
       const data = await serverQuranService.getAllSurahs();
       setSurahs(data);
     } catch (err: any) {
-      console.error('Failed to load Quran surah data:', err);
       setError(err.message || 'Failed to load surahs');
     } finally {
       setLoading(false);
@@ -62,8 +74,8 @@ export default function QuranListScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4CAF50" />
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={COLORS.primary[500]} />
           <RNText style={styles.loadingText}>Loading Surahs...</RNText>
         </View>
       </SafeAreaView>
@@ -73,7 +85,7 @@ export default function QuranListScreen() {
   if (error) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.errorContainer}>
+        <View style={styles.centered}>
           <Ionicons name="alert-circle-outline" size={48} color="#ef4444" />
           <RNText style={styles.errorText}>{error}</RNText>
           <Pressable onPress={loadSurahs} style={styles.retryButton}>
@@ -84,7 +96,7 @@ export default function QuranListScreen() {
     );
   }
 
-  const renderSurahCard = ({ item }: { item: Surah }) => (
+  const renderItem = ({ item }: { item: Surah }) => (
     <Pressable
       onPress={() =>
         navigation.navigate('Surah', {
@@ -92,47 +104,36 @@ export default function QuranListScreen() {
           surahName: item.name,
         })
       }
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
     >
-      <Card style={styles.card}>
-        <Card.Body>
-          <View style={styles.cardContent}>
-            {/* Surah Number Badge */}
-            <View style={styles.numberContainer}>
-              <RNText style={styles.numberText}>{item.number}</RNText>
-            </View>
+      {/* Ornamental surah number badge */}
+      <SurahBadge number={item.number} />
 
-            {/* Surah Info */}
-            <View style={styles.infoContainer}>
-              <RNText style={styles.arabicName}>{item.name}</RNText>
-              <RNText style={styles.englishName}>
-                {item.englishNameTranslation}
-              </RNText>
-              <View style={styles.metaRow}>
-                <Chip
-                  size="sm"
-                  variant="soft"
-                  color={
-                    item.revelationType.toLowerCase() === 'meccan'
-                      ? 'accent'
-                      : 'success'
-                  }
-                >
-                  <Chip.Label>
-                    {item.revelationType.charAt(0).toUpperCase() +
-                      item.revelationType.slice(1)}
-                  </Chip.Label>
-                </Chip>
-                <RNText style={styles.ayahCount}>
-                  {item.numberOfAyahs} Ayahs
-                </RNText>
-              </View>
-            </View>
+      {/* Surah info */}
+      <View style={styles.info}>
+        <RNText style={styles.arabicName}>{item.name}</RNText>
+        <RNText style={styles.englishName}>{item.englishNameTranslation}</RNText>
+        <View style={styles.metaRow}>
+          <Chip
+            size="sm"
+            variant="soft"
+            color={
+              item.revelationType.toLowerCase() === 'meccan' ? 'accent' : 'success'
+            }
+          >
+            <Chip.Label>
+              {item.revelationType.charAt(0).toUpperCase() +
+                item.revelationType.slice(1)}
+            </Chip.Label>
+          </Chip>
+          <RNText style={styles.ayahCount}>
+            {item.numberOfAyahs} Ayahs
+          </RNText>
+        </View>
+      </View>
 
-            {/* Chevron Icon */}
-            <Ionicons name="chevron-forward" size={24} color="#9ca3af" />
-          </View>
-        </Card.Body>
-      </Card>
+      {/* Chevron */}
+      <Ionicons name="chevron-forward" size={20} color="#C4C4C4" />
     </Pressable>
   );
 
@@ -142,97 +143,145 @@ export default function QuranListScreen() {
       <View style={styles.header}>
         <View style={styles.topRow}>
           <View style={{ width: 40 }} />
-          <RNText style={styles.title}>Holy Quran</RNText>
+          <View style={styles.titleBlock}>
+            <RNText style={styles.arabicTitle}>القرآن الكريم</RNText>
+            <RNText style={styles.title}>Holy Quran</RNText>
+          </View>
           <Pressable
             onPress={() => navigation.navigate('Profile' as any)}
             style={styles.profileButton}
           >
-            <Ionicons name="person-circle-outline" size={32} color="#4CAF50" />
+            <Ionicons
+              name="person-circle-outline"
+              size={32}
+              color={COLORS.primary[600]}
+            />
           </Pressable>
         </View>
         <RNText style={styles.subtitle}>Read and explore the verses</RNText>
       </View>
 
-      {/* Surah List */}
       <FlatList
         data={surahs}
-        renderItem={renderSurahCard}
+        renderItem={renderItem}
         keyExtractor={item => item.number.toString()}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
       />
     </SafeAreaView>
   );
 }
 
+const BADGE_OUTER = 52;
+const BADGE_INNER = 38;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#FAFDF9',
   },
+
+  // ── Header ───────────────────────────────────────────────────────────────
   header: {
-    padding: 20,
-    paddingTop: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#1B5E20',
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#6b7280',
-    textAlign: 'center',
-  },
-  listContent: {
-    padding: 16,
-    paddingBottom: 80,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: COLORS.border.light,
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 4,
   },
-  profileButton: {
-    padding: 4,
-  },
-  card: {
-    marginBottom: 12,
-  },
-  cardContent: {
-    flexDirection: 'row',
+  titleBlock: {
     alignItems: 'center',
   },
-  numberContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#E8F5E9',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
+  arabicTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.primary[700],
+    textAlign: 'center',
   },
-  numberText: {
+  title: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#2E7D32',
+    color: COLORS.primary[900],
+    textAlign: 'center',
   },
-  infoContainer: {
+  subtitle: {
+    fontSize: 14,
+    color: '#9ca3af',
+    textAlign: 'center',
+  },
+  profileButton: { padding: 4 },
+
+  // ── List ─────────────────────────────────────────────────────────────────
+  listContent: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 80,
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#E5E7EB',
+    marginLeft: 16 + BADGE_OUTER + 14, // align with text, skip badge
+  },
+
+  // ── Surah card ───────────────────────────────────────────────────────────
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+    backgroundColor: 'transparent',
+  },
+  cardPressed: {
+    opacity: 0.6,
+  },
+
+  // ── Ornamental badge ──────────────────────────────────────────────────────
+  badgeOuter: {
+    width: BADGE_OUTER,
+    height: BADGE_OUTER,
+    borderRadius: BADGE_OUTER / 2,
+    borderWidth: 1,
+    borderColor: COLORS.primary[200],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+    flexShrink: 0,
+  },
+  badgeInner: {
+    width: BADGE_INNER,
+    height: BADGE_INNER,
+    borderRadius: BADGE_INNER / 2,
+    backgroundColor: COLORS.primary[50],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.primary[800],
+    includeFontPadding: false,
+  },
+
+  // ── Surah info ────────────────────────────────────────────────────────────
+  info: {
     flex: 1,
   },
   arabicName: {
     fontSize: 20,
     fontWeight: '700',
     color: '#111827',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   englishName: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#6b7280',
     marginBottom: 8,
   },
@@ -245,7 +294,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#9ca3af',
   },
-  loadingContainer: {
+
+  // ── States ────────────────────────────────────────────────────────────────
+  centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
@@ -255,12 +306,6 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     color: '#6b7280',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
   },
   errorText: {
     marginTop: 16,
@@ -272,7 +317,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
     paddingVertical: 12,
     paddingHorizontal: 24,
-    backgroundColor: '#4CAF50',
+    backgroundColor: COLORS.primary[500],
     borderRadius: 8,
   },
   retryText: {
