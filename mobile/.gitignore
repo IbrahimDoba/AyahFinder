@@ -15,6 +15,10 @@ node_modules/
 dist/
 web-build/
 
+# iOS generated
+ios/Pods/
+ios/build/
+
 # Native
 *.jks
 *.p8
