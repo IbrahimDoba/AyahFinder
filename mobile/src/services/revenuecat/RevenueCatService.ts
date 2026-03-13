@@ -56,8 +56,23 @@ const createMockPackage = (): PurchasesPackage => {
  * Manages subscriptions and purchases
  */
 class RevenueCatService {
+  private _configured = false;
   private testPurchaseActive = false;
   private testCustomerInfo: CustomerInfo | null = null;
+
+  /**
+   * Configure the RevenueCat SDK. Call this from App.tsx instead of
+   * calling Purchases.configure() directly.
+   */
+  configure(apiKey: string): void {
+    Purchases.configure({ apiKey });
+    this._configured = true;
+    console.log('[RevenueCat] SDK configured');
+  }
+
+  private isReady(): boolean {
+    return this._configured;
+  }
   /**
    * Get available offerings from RevenueCat
    * In TEST_MODE, returns mock data without requiring Google Play
@@ -252,6 +267,10 @@ class RevenueCatService {
     }
 
     try {
+      if (!this.isReady()) {
+        console.warn('[RevenueCat] SDK not configured, cannot get customer info');
+        return null;
+      }
       const customerInfo = await Purchases.getCustomerInfo();
       return customerInfo;
     } catch (error) {
@@ -341,8 +360,7 @@ class RevenueCatService {
       }
 
       // Check if SDK is configured before getting app user ID
-      const isConfigured = await Purchases.isConfigured();
-      if (!isConfigured) {
+      if (!this.isReady()) {
         console.warn('[RevenueCat] SDK not configured, skipping server sync');
         return;
       }
@@ -374,8 +392,7 @@ class RevenueCatService {
 
     try {
       // Check if SDK is configured
-      const isConfigured = await Purchases.isConfigured();
-      if (!isConfigured) {
+      if (!this.isReady()) {
         console.warn('[RevenueCat] SDK not configured, skipping logout');
         return;
       }
@@ -401,8 +418,7 @@ class RevenueCatService {
 
     try {
       // Check if SDK is configured
-      const isConfigured = await Purchases.isConfigured();
-      if (!isConfigured) {
+      if (!this.isReady()) {
         console.warn('[RevenueCat] SDK not configured yet, skipping login. Will retry on next app start.');
         return null;
       }
@@ -429,7 +445,10 @@ class RevenueCatService {
     }
 
     try {
+      console.log('[RevenueCat] getManagementURL: isReady =', this.isReady());
       const customerInfo = await this.getCustomerInfo();
+      console.log('[RevenueCat] customerInfo =', JSON.stringify(customerInfo));
+      console.log('[RevenueCat] managementURL =', customerInfo?.managementURL);
 
       if (!customerInfo?.managementURL) {
         console.warn('[RevenueCat] No management URL available');

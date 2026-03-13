@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, Pressable, Linking, Modal, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '@/presentation/components/common/Text';
 import { HeroButton } from '@/presentation/components/common/HeroButton';
@@ -12,6 +13,7 @@ import { useSettingsStore } from '@/presentation/store/settingsStore';
 import revenueCatService from '@/services/revenuecat/RevenueCatService';
 import { showAlert } from '@/presentation/store/alertStore';
 import notificationService from '@/services/notifications/NotificationService';
+import serverUsageService from '@/services/usage/ServerUsageService';
 import { wp, hp, rs, normalize } from '@/utils/responsive';
 
 export default function ProfileScreen() {
@@ -26,6 +28,44 @@ export default function ProfileScreen() {
   } = useSettingsStore();
   const [localLoading, setLocalLoading] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [usageStats, setUsageStats] = useState<any | null>(null);
+
+  const loadUsageStats = async () => {
+    try {
+      const stats = await serverUsageService.getUsageStats();
+      setUsageStats(stats);
+    } catch (error) {
+      console.warn('[Profile] Error loading usage stats:', error);
+    }
+  };
+
+  useEffect(() => {
+    loadUsageStats();
+  }, [user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadUsageStats();
+    }, [])
+  );
+
+  const getResetTimeText = (): string => {
+    if (!usageStats?.resetAt) return '';
+    const now = new Date();
+    const resetTime = new Date(usageStats.resetAt);
+    const diffMs = resetTime.getTime() - now.getTime();
+    if (diffMs <= 0) return 'Resets soon';
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    if (usageStats.period === 'monthly') {
+      const days = Math.floor(diffHours / 24);
+      const remainingHours = diffHours % 24;
+      if (days > 0) return `Resets in ${days} day${days > 1 ? 's' : ''}${remainingHours > 0 ? ` ${remainingHours}h` : ''}`;
+      return `Resets in ${diffHours}h ${diffMinutes}m`;
+    }
+    if (diffHours > 0) return `Resets in ${diffHours}h ${diffMinutes}m`;
+    return `Resets in ${diffMinutes}m`;
+  };
   const [pickerHour, setPickerHour] = useState(readingReminderHour);
   const [pickerMinute, setPickerMinute] = useState(readingReminderMinute);
 
@@ -310,6 +350,45 @@ export default function ProfileScreen() {
           </View>
         </Card>
 
+        {usageStats && (
+          <>
+            <Text variant="h3" style={styles.sectionTitle}>
+              Usage
+            </Text>
+            <Card style={styles.detailsCard}>
+              <View style={styles.detailRow}>
+                <View style={styles.detailIcon}>
+                  <Ionicons name="flash-outline" size={20} color={usageStats.remaining === 0 ? COLORS.error : COLORS.primary[500]} />
+                </View>
+                <View style={styles.detailTextContainer}>
+                  <Text variant="body" style={styles.detailLabel}>
+                    {usageStats.tier === 'premium' ? 'Searches This Month' : 'Searches Today'}
+                  </Text>
+                  <Text variant="h3" style={[styles.detailValue, usageStats.remaining === 0 && { color: COLORS.error }]}>
+                    {`${usageStats.remaining} / ${usageStats.limit} remaining`}
+                  </Text>
+                  {usageStats.remaining < usageStats.limit && (
+                    <Text variant="caption" color={COLORS.text.secondary} style={{ marginTop: rs(2) }}>
+                      {getResetTimeText()}
+                    </Text>
+                  )}
+                </View>
+              </View>
+              <View style={styles.usageBarBackground}>
+                <View
+                  style={[
+                    styles.usageBarFill,
+                    {
+                      width: `${(usageStats.remaining / usageStats.limit) * 100}%` as any,
+                      backgroundColor: usageStats.remaining === 0 ? COLORS.error : COLORS.primary[500],
+                    },
+                  ]}
+                />
+              </View>
+            </Card>
+          </>
+        )}
+
         <Text variant="h3" style={styles.sectionTitle}>
           Account Details
         </Text>
@@ -573,6 +652,7 @@ const styles = StyleSheet.create({
     marginBottom: rs(32),
     backgroundColor: '#E8F5E9',
     borderColor: '#C8E6C9',
+    borderRadius: rs(20),
   },
   profileHeader: {
     flexDirection: 'row',
@@ -675,6 +755,18 @@ const styles = StyleSheet.create({
     color: '#F44336',
     fontSize: normalize(16, 0.3),
     fontWeight: '600',
+  },
+  usageBarBackground: {
+    height: rs(6),
+    backgroundColor: '#e5e7eb',
+    borderRadius: rs(3),
+    marginHorizontal: rs(20),
+    marginBottom: rs(16),
+    overflow: 'hidden',
+  },
+  usageBarFill: {
+    height: '100%',
+    borderRadius: rs(3),
   },
   // Toggle styles
   toggleRow: {

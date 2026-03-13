@@ -201,6 +201,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   arabicTitle: {
+    fontFamily: 'UthmanicHafs',
     fontSize: 18,
     fontWeight: '700',
     color: COLORS.primary[700],
@@ -275,6 +276,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   arabicName: {
+    fontFamily: 'UthmanicHafs',
     fontSize: 20,
     fontWeight: '700',
     color: '#111827',

@@ -180,6 +180,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   surahName: {
+    fontFamily: 'UthmanicHafs',
     marginTop: 4,
   },
   divider: {

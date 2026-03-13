@@ -265,6 +265,7 @@ const styles = StyleSheet.create({
     color: COLORS.primary[700],
   },
   arabicPreview: {
+    fontFamily: 'UthmanicHafs',
     fontSize: 18,
     lineHeight: 32,
     color: '#111827',

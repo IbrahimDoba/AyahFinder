@@ -81,6 +81,7 @@ const styles = StyleSheet.create({
   },
 
   arabic: {
+    fontFamily: TYPOGRAPHY.fonts.arabic.regular,
     fontSize: TYPOGRAPHY.arabicSizes.lg,
     lineHeight: TYPOGRAPHY.arabicSizes.lg * TYPOGRAPHY.lineHeights.arabic,
     textAlign: 'right',

@@ -8,8 +8,7 @@ export const TYPOGRAPHY = {
   // Font families
   fonts: {
     arabic: {
-      regular: 'System', // Will use system Arabic font
-      // Future: 'Amiri' or 'Scheherazade New'
+      regular: 'UthmanicHafs',
     },
     english: {
       regular: 'System',

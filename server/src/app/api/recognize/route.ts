@@ -56,23 +56,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    console.log("🎵 Processing audio recognition request...");
+    console.log(
+      `File: ${audioFile.name}, Size: ${(audioFile.size / 1024).toFixed(2)} KB, MIME Type: ${audioFile.type}`,
+    );
+
     // Validate file type
+    const allowedFormats = [...AUDIO_CONFIG.ALLOWED_FORMATS, 'audio/mp4', 'audio/x-m4a', 'application/octet-stream'];
     if (
-      !(AUDIO_CONFIG.ALLOWED_FORMATS as readonly string[]).includes(
-        audioFile.type,
-      )
+      !allowedFormats.includes(audioFile.type) &&
+      !audioFile.name.endsWith('.m4a') && 
+      !audioFile.name.endsWith('.mp3') &&
+      !audioFile.name.endsWith('.wav')
     ) {
       return handleError(
         new Error(
-          `Invalid audio format. Allowed formats: ${AUDIO_CONFIG.ALLOWED_FORMATS.join(", ")}`,
+          `Invalid audio format (${audioFile.type}). Allowed formats: ${allowedFormats.join(", ")} or .m4a/.mp3/.wav extensions.`,
         ),
       );
     }
-
-    console.log("🎵 Processing audio recognition...");
-    console.log(
-      `File: ${audioFile.name}, Size: ${(audioFile.size / 1024).toFixed(2)} KB, Type: ${audioFile.type}`,
-    );
 
     // Step 1: Transcribe audio with Whisper
     const transcription = await openAIService.transcribeAudio(

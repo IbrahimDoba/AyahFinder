@@ -42,7 +42,7 @@ class ServerUsageService {
       console.log('[Usage] Usage check result:', response);
       return response;
     } catch (error: any) {
-      console.error('[Usage] Error checking usage:', error);
+      console.warn('[Usage] Error checking usage (silenced):', error.message);
 
       // On error, deny access for safety
       return {
@@ -100,7 +100,7 @@ class ServerUsageService {
       console.log('[Usage] Usage stats:', stats);
       return stats;
     } catch (error: any) {
-      console.error('[Usage] Error fetching usage stats:', error);
+      console.warn('[Usage] Error fetching usage stats (silenced):', error.message);
 
       // Return default stats on error
       return {

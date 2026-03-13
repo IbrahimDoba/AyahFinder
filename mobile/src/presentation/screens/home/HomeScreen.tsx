@@ -105,7 +105,7 @@ export default function HomeScreen() {
       console.log('[Usage] Stats received:', stats);
       setUsageStats(stats);
     } catch (error) {
-      console.error('[Usage] Error loading usage stats:', error);
+      console.warn('[Usage] Error loading usage stats (silenced):', error);
     }
   };
 
@@ -461,42 +461,6 @@ export default function HomeScreen() {
             Identify Quran recitations instantly
           </Text>
 
-          {/* Usage Counter */}
-          {usageStats && (
-            <View style={styles.usageCounter}>
-              <Ionicons
-                name="flash-outline"
-                size={16}
-                color={
-                  usageStats.remaining === 0
-                    ? COLORS.error[500]
-                    : COLORS.primary[500]
-                }
-              />
-              <View style={styles.usageTextContainer}>
-                <Text
-                  variant="caption"
-                  color={
-                    usageStats.remaining === 0
-                      ? COLORS.error[500]
-                      : COLORS.primary[500]
-                  }
-                  style={styles.usageMainText}
-                >
-                  {`${usageStats.remaining}/${usageStats.limit} searches ${usageStats.tier === 'premium' ? 'this month' : 'today'}`}
-                </Text>
-                {usageStats.remaining < usageStats.limit && (
-                  <Text
-                    variant="caption"
-                    color={COLORS.text.secondary}
-                    style={styles.usageResetText}
-                  >
-                    {getResetTimeText()}
-                  </Text>
-                )}
-              </View>
-            </View>
-          )}
         </View>
 
         {/* Listen Button */}
@@ -579,33 +543,6 @@ const styles = StyleSheet.create({
   },
   profileButton: {
     padding: 4,
-  },
-  usageCounter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: '#E8F5E9',
-    borderRadius: 20,
-    alignSelf: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  usageTextContainer: {
-    alignItems: 'center',
-  },
-  usageMainText: {
-    fontWeight: '600',
-  },
-  usageResetText: {
-    fontSize: 10,
-    marginTop: 2,
   },
   buttonContainer: {
     flex: 1,

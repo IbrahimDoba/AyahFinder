@@ -35,7 +35,7 @@ export const TOKEN_EXPIRY = {
 export const AUDIO_CONFIG = {
   MAX_SIZE_MB: 10,
   MAX_SIZE_BYTES: 10 * 1024 * 1024,
-  ALLOWED_FORMATS: ['audio/m4a', 'audio/wav', 'audio/mp3', 'audio/mpeg'],
+  ALLOWED_FORMATS: ['audio/m4a', 'audio/mp4', 'audio/x-m4a', 'audio/wav', 'audio/mp3', 'audio/mpeg'],
   MAX_DURATION_SECONDS: 15,
 } as const;
 
