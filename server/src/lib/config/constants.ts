@@ -10,7 +10,7 @@ export const USAGE_LIMITS = {
     DAILY_SEARCHES: 5,
   },
   PREMIUM: {
-    MONTHLY_SEARCHES: 100,
+    DAILY_SEARCHES: 100,
   },
 } as const;
 

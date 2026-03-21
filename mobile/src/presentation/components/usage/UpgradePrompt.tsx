@@ -38,14 +38,14 @@ const getUpgradeMessage = (
       return {
         title: 'Daily Limit Reached',
         message:
-          "You've used your 5 searches today. Upgrade to Premium for 100 searches per month!",
+          "You've used your 5 searches today. Upgrade to Premium for 100 searches per day!",
         buttonText: 'Upgrade to Premium',
       };
     case 'premium':
       return {
-        title: 'Monthly Limit Reached',
+        title: 'Daily Limit Reached',
         message:
-          "You've used all 100 searches this month. Your limit will reset on your next billing date.",
+          "You've used all 100 searches today. Your limit will reset at midnight UTC.",
         buttonText: 'View Account',
       };
     default:
@@ -135,7 +135,7 @@ export function UpgradePrompt({
                 </Text>
                 <View style={styles.benefitItem}>
                   <Text variant="body" style={styles.benefitText}>
-                    • 100 audio searches per month
+                    • 100 audio searches per day
                   </Text>
                 </View>
                 <View style={styles.benefitItem}>

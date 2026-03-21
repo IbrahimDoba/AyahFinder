@@ -297,7 +297,7 @@ export default function HomeScreen() {
             limit: result.usage.limit,
             tier: (result.usage.subscriptionTier || 'anonymous') as any,
             resetAt: result.usage.resetAt ? new Date(result.usage.resetAt) : new Date(),
-            period: result.usage.subscriptionTier === 'premium' ? 'monthly' : 'daily',
+            period: 'daily',
           });
         }
 

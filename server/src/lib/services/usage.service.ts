@@ -89,15 +89,15 @@ class UsageService {
 
     // Check limits based on subscription tier
     if (user.subscriptionTier === 'premium') {
-      const limit = USAGE_LIMITS.PREMIUM.MONTHLY_SEARCHES;
-      const remaining = Math.max(0, limit - usageRecord.monthlySearchCount);
+      const limit = USAGE_LIMITS.PREMIUM.DAILY_SEARCHES;
+      const remaining = Math.max(0, limit - usageRecord.searchCount);
 
-      if (usageRecord.monthlySearchCount >= limit) {
+      if (usageRecord.searchCount >= limit) {
         return {
           allowed: false,
           remaining: 0,
           limit,
-          reason: 'Monthly limit reached. Your limit resets on the 1st of next month.',
+          reason: 'Daily limit reached. Your limit resets at midnight UTC.',
         };
       }
 
@@ -116,7 +116,7 @@ class UsageService {
           allowed: false,
           remaining: 0,
           limit,
-          reason: 'Daily limit reached. Upgrade to Premium for 100 searches per month!',
+          reason: 'Daily limit reached. Upgrade to Premium for 100 searches per day!',
         };
       }
 
@@ -281,17 +281,17 @@ class UsageService {
     });
 
     if (user.subscriptionTier === "premium") {
-      const limit = USAGE_LIMITS.PREMIUM.MONTHLY_SEARCHES;
-      const used = usageRecord?.monthlySearchCount || 0;
+      const limit = USAGE_LIMITS.PREMIUM.DAILY_SEARCHES;
+      const used = usageRecord?.searchCount || 0;
       const remaining = Math.max(0, limit - used);
 
       return {
         used,
         remaining,
         limit,
-        resetAt: this.getMonthlyResetTime().toISOString(),
+        resetAt: this.getNextResetTime().toISOString(),
         subscriptionTier: "premium",
-        period: "monthly",
+        period: "daily",
       };
     } else {
       const limit = USAGE_LIMITS.FREE.DAILY_SEARCHES;

@@ -136,7 +136,7 @@ export default function SubscriptionModal({
               <View style={styles.benefitRow}>
                 <Ionicons name="checkmark" size={20} color="#10B981" />
                 <Text variant="caption" style={styles.benefitText}>
-                  100 searches per month activated
+                  100 searches per day activated
                 </Text>
               </View>
               <View style={styles.benefitRow}>

@@ -213,7 +213,7 @@ If you didn't request a password reset, you can safely ignore this email. Your p
 
             <h3 style="color: #667eea; margin-top: 30px;">Free Tier Limits:</h3>
             <p style="background: #f5f5f5; padding: 15px; border-radius: 6px; margin: 20px 0;">
-              You get <strong>5 verse recognitions per day</strong>. Upgrade to Premium for 100 searches per month!
+              You get <strong>5 verse recognitions per day</strong>. Upgrade to Premium for 100 searches per day!
             </p>
 
             <div style="text-align: center; margin: 30px 0;">
@@ -242,7 +242,7 @@ What you can do:
 - Mark your favorite verses (coming soon)
 
 Free Tier Limits:
-You get 5 verse recognitions per day. Upgrade to Premium for 100 searches per month!
+You get 5 verse recognitions per day. Upgrade to Premium for 100 searches per day!
 
 Start exploring now!
 
